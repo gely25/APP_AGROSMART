@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../theme/app_theme.dart';
-import '../../providers/farm_provider.dart';
-import '../../widgets/connection_badge.dart';
+import '../theme/app_theme.dart';
+import '../providers/farm_provider.dart';
+import '../widgets/connection_badge.dart';
 import 'dashboard_screen.dart';
 import 'control_screen.dart';
 import 'realtime_screen.dart';

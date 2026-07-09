@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../theme/app_theme.dart';
-import '../../providers/farm_provider.dart';
-import '../../models/farm_state.dart';
-import '../../widgets/alarm_card.dart';
-import '../../animations/door_animation.dart';
-import '../../animations/feeder_animation.dart';
-import '../../animations/water_animation.dart';
+import '../theme/app_theme.dart';
+import '../providers/farm_provider.dart';
+import '../models/farm_state.dart';
+import '../widgets/alarm_card.dart';
+import '../animations/door_animation.dart';
+import '../animations/feeder_animation.dart';
+import '../animations/water_animation.dart';
 
 class ControlScreen extends StatelessWidget {
   const ControlScreen({super.key});

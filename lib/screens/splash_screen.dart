@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../theme/app_theme.dart';
+import '../theme/app_theme.dart';
 
 /// Splash screen — matches the React SplashScreen with pop animation and bounce dots.
 class SplashScreen extends StatefulWidget {

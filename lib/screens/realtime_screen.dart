@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../../theme/app_theme.dart';
-import '../../providers/farm_provider.dart';
-import '../../models/farm_state.dart';
-import '../../widgets/realtime_row.dart';
-import '../../widgets/status_card.dart';
+import '../theme/app_theme.dart';
+import '../providers/farm_provider.dart';
+import '../models/farm_state.dart';
+import '../widgets/realtime_row.dart';
+import '../widgets/status_card.dart';
 
 class RealtimeScreen extends StatelessWidget {
   const RealtimeScreen({super.key});

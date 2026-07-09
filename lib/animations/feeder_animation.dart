@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
-import '../../models/farm_state.dart';
+import '../theme/app_theme.dart';
+import '../models/farm_state.dart';
 
 const _duration = Duration(milliseconds: 1000);
 

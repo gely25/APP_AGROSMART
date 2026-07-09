@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
+import '../theme/app_theme.dart';
 
 /// Animated alarm card — matches the React AlarmCard component.
 /// Shows a pulsing red card when alarm is active, a calm green card when silent.
