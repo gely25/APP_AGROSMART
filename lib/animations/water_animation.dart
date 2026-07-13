@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
@@ -13,6 +14,14 @@ class WaterAnimation extends StatefulWidget {
   State<WaterAnimation> createState() => _WaterAnimationState();
 }
 
+class _PirServoCurve extends Curve {
+  @override
+  double transformInternal(double t) {
+    // A servo-like smooth S-curve
+    return Curves.easeInOutCubic.transform(t);
+  }
+}
+
 class _WaterAnimationState extends State<WaterAnimation>
     with TickerProviderStateMixin {
   late AnimationController _levelCtrl;
@@ -22,7 +31,8 @@ class _WaterAnimationState extends State<WaterAnimation>
   late AnimationController _surfaceCtrl;
   late Animation<double> _surface;
 
-  double _targetLevel = 0.04;
+  bool _streamVisible = false;
+  Timer? _streamTimer;
 
   @override
   void initState() {
@@ -30,10 +40,10 @@ class _WaterAnimationState extends State<WaterAnimation>
 
     _levelCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1300),
+      duration: const Duration(milliseconds: 2000), // Smoother, more natural rise/fall duration
     );
     _level = Tween<double>(begin: 0.04, end: 0.04).animate(
-      CurvedAnimation(parent: _levelCtrl, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _levelCtrl, curve: _PirServoCurve()),
     );
 
     _valveCtrl = AnimationController(
@@ -43,10 +53,10 @@ class _WaterAnimationState extends State<WaterAnimation>
 
     _surfaceCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
     _surface = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _surfaceCtrl, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _surfaceCtrl, curve: Curves.linear),
     );
 
     _applyState(widget.waterState, animate: false);
@@ -68,16 +78,31 @@ class _WaterAnimationState extends State<WaterAnimation>
       case WaterState.empty:   newTarget = 0.04; break;
     }
 
+    _streamTimer?.cancel();
+
     if (state == WaterState.filling) {
+      // Start valve rotation
       _valveCtrl.repeat();
+      // Delay the stream slightly to simulate valve opening first
+      if (animate) {
+        setState(() => _streamVisible = false);
+        _streamTimer = Timer(const Duration(milliseconds: 300), () {
+          if (mounted && widget.waterState == WaterState.filling) {
+            setState(() => _streamVisible = true);
+          }
+        });
+      } else {
+        _streamVisible = true;
+      }
     } else {
       _valveCtrl.stop();
       _valveCtrl.reset();
+      _streamVisible = false;
     }
 
     if (animate) {
       _level = Tween<double>(begin: _level.value, end: newTarget).animate(
-        CurvedAnimation(parent: _levelCtrl, curve: Curves.easeInOut),
+        CurvedAnimation(parent: _levelCtrl, curve: _PirServoCurve()),
       );
       _levelCtrl
         ..reset()
@@ -90,6 +115,7 @@ class _WaterAnimationState extends State<WaterAnimation>
 
   @override
   void dispose() {
+    _streamTimer?.cancel();
     _levelCtrl.dispose();
     _valveCtrl.dispose();
     _surfaceCtrl.dispose();
@@ -173,7 +199,7 @@ class _WaterAnimationState extends State<WaterAnimation>
                 )),
 
               // Water stream while filling
-              if (_isFilling)
+              if (_isFilling && _streamVisible)
                 Positioned(top: 58, right: 40,
                   child: _WaterStream()),
 
@@ -195,12 +221,15 @@ class _WaterAnimationState extends State<WaterAnimation>
                   ))),
 
               // Trough basin
-              Positioned(bottom: 24,
+              Positioned(
+                bottom: 24,
                 child: _Trough(
                   level: _level.value,
-                  isFilling: _isFilling,
+                  isFilling: _isFilling && _streamVisible,
                   surfaceAnim: _surface.value,
-                )),
+                  waterState: widget.waterState,
+                ),
+              ),
             ],
           ),
         ),
@@ -222,7 +251,7 @@ class _WaterStreamState extends State<_WaterStream>
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600))
-      ..repeat(reverse: true);
+      ..repeat();
   }
 
   @override
@@ -234,19 +263,24 @@ class _WaterStreamState extends State<_WaterStream>
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: List.generate(5, (i) {
+      children: List.generate(6, (i) {
         return AnimatedBuilder(
           animation: _ctrl,
-          builder: (_, child) => Opacity(
-            opacity: ((sin(_ctrl.value * pi + i * 0.8) * 0.5 + 0.5)).clamp(0.0, 1.0),
-            child: child,
-          ),
+          builder: (_, child) {
+            // Cascade effect downwards
+            double offset = _ctrl.value * pi;
+            double opacity = ((sin(offset + i * 0.8) * 0.4 + 0.6)).clamp(0.0, 1.0);
+            return Opacity(
+              opacity: opacity,
+              child: child,
+            );
+          },
           child: Container(
-            width: 6, height: 12,
-            margin: const EdgeInsets.only(bottom: 4),
+            width: 5, height: 10,
+            margin: const EdgeInsets.only(bottom: 2),
             decoration: BoxDecoration(
-              color: AppColors.waterColor.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(3),
+              color: AppColors.waterColor.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
         );
@@ -255,21 +289,70 @@ class _WaterStreamState extends State<_WaterStream>
   }
 }
 
+class WaveClipper extends CustomClipper<Path> {
+  final double animationValue;
+  final bool isFilling;
+  final bool isEmpty;
+
+  WaveClipper({
+    required this.animationValue,
+    required this.isFilling,
+    required this.isEmpty,
+  });
+
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    if (isEmpty) {
+      // flat rectangle for empty state
+      path.addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+      return path;
+    }
+
+    path.moveTo(0, size.height);
+    path.lineTo(0, 8.0);
+
+    // Draw elegant sinusoidal waves across the surface
+    final double waveHeight = isFilling ? 5.0 : 2.5; // Slightly taller waves when filling
+    final double waveLength = size.width / 1.5; // Frequency of waves
+    final double phase = animationValue * 2 * pi;
+
+    for (double x = 0; x <= size.width; x += 2) {
+      final double y = 8.0 + sin((x / waveLength) * 2 * pi - phase) * waveHeight;
+      path.lineTo(x, y);
+    }
+
+    path.lineTo(size.width, size.height);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(WaveClipper oldClipper) {
+    return oldClipper.animationValue != animationValue ||
+        oldClipper.isFilling != isFilling ||
+        oldClipper.isEmpty != isEmpty;
+  }
+}
+
 class _Trough extends StatelessWidget {
   final double level;
   final bool isFilling;
   final double surfaceAnim;
+  final WaterState waterState;
 
   const _Trough({
     required this.level,
     required this.isFilling,
     required this.surfaceAnim,
+    required this.waterState,
   });
 
   @override
   Widget build(BuildContext context) {
     const troughHeight = 96.0;
     const troughWidth = 208.0;
+    final bool isEmpty = waterState == WaterState.empty && level <= 0.05;
 
     return Container(
       width: troughWidth, height: troughHeight,
@@ -289,37 +372,53 @@ class _Trough extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // Water body
+          // Water body with animated WaveClipper
           Positioned(
             bottom: 0, left: 0, right: 0,
             height: troughHeight * level,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.waterColor.withOpacity(0.6),
-                    AppColors.waterColor.withOpacity(0.8),
+            child: ClipPath(
+              clipper: WaveClipper(
+                animationValue: surfaceAnim,
+                isFilling: isFilling,
+                isEmpty: isEmpty,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.waterColor.withOpacity(0.6),
+                      AppColors.waterColor.withOpacity(0.8),
+                    ],
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    // Shimmering surface line highlight
+                    if (!isEmpty)
+                      Positioned(
+                        top: 0, left: 0, right: 0,
+                        height: 12,
+                        child: ClipPath(
+                          clipper: WaveClipper(
+                            animationValue: surfaceAnim,
+                            isFilling: isFilling,
+                            isEmpty: isEmpty,
+                          ),
+                          child: Container(
+                            color: Colors.white.withOpacity(0.25),
+                          ),
+                        ),
+                      ),
+                    // Bubbles while filling
+                    if (isFilling)
+                      ...List.generate(5, (i) => Positioned(
+                        bottom: 4,
+                        left: (0.12 + i * 0.18) * troughWidth,
+                        child: _Bubble(delay: i * 130),
+                      )),
                   ],
                 ),
-              ),
-              child: Stack(
-                children: [
-                  // Shimmering surface
-                  Positioned(top: 0, left: 0, right: 0,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      height: isFilling ? 6 + surfaceAnim * 3 : 6,
-                      color: AppColors.waterColor.withOpacity(0.3 + surfaceAnim * 0.2),
-                    )),
-                  // Bubbles while filling
-                  if (isFilling)
-                    ...List.generate(5, (i) => Positioned(
-                      bottom: 4,
-                      left: (0.12 + i * 0.18) * troughWidth,
-                      child: _Bubble(delay: i * 130),
-                    )),
-                ],
               ),
             ),
           ),
@@ -349,22 +448,23 @@ class _Bubble extends StatefulWidget {
 class _BubbleState extends State<_Bubble> with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _anim;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))
-      ..repeat(reverse: true);
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
     _anim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeIn),
     );
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _ctrl.repeat(reverse: true);
+    _timer = Timer(Duration(milliseconds: widget.delay), () {
+      if (mounted) _ctrl.repeat();
     });
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
@@ -373,13 +473,22 @@ class _BubbleState extends State<_Bubble> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Container(
-        width: 6, height: 6,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.3 + _anim.value * 0.2),
-        ),
-      ),
+      builder: (_, __) {
+        // float upwards
+        return Opacity(
+          opacity: (1.0 - _anim.value).clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, -_anim.value * 60),
+            child: Container(
+              width: 5, height: 5,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.6),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

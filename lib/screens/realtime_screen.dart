@@ -73,10 +73,10 @@ class RealtimeScreen extends StatelessWidget {
                     ),
                     const Divider(height: 1),
                     RealtimeRow(
-                      icon: Icons.set_meal_outlined,
-                      label: 'Comedero',
-                      value: s.feederState == FeederState.open ? 'Abierto' : 'Cerrado',
-                      tone: s.feederState == FeederState.open ? StatusTone.success : StatusTone.alert,
+                      icon: Icons.sensors_rounded,
+                      label: 'Sensor PIR',
+                      value: s.animalDetected ? 'Movimiento detectado' : 'Sin movimiento',
+                      tone: s.animalDetected ? StatusTone.info : StatusTone.neutral,
                     ),
                     const Divider(height: 1),
                     RealtimeRow(

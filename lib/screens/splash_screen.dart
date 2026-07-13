@@ -20,6 +20,9 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _popOpacity;
 
   late List<AnimationController> _dotCtrls;
+  Timer? _delayTimer;
+  final List<Timer> _dotTimers = [];
+  Timer? _completeTimer;
 
   @override
   void initState() {
@@ -47,25 +50,33 @@ class _SplashScreenState extends State<SplashScreen>
     _popCtrl.forward();
 
     // Start dots after logo
-    Future.delayed(const Duration(milliseconds: 400), () {
+    _delayTimer = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
       for (int i = 0; i < 3; i++) {
-        Future.delayed(Duration(milliseconds: i * 150), () {
+        final t = Timer(Duration(milliseconds: i * 150), () {
           if (mounted) _dotCtrls[i].repeat(reverse: true);
         });
+        _dotTimers.add(t);
       }
     });
 
     // Navigate after 2200ms (matches React setTimeout)
-    Timer(const Duration(milliseconds: 2200), () {
+    _completeTimer = Timer(const Duration(milliseconds: 2200), () {
       if (mounted) widget.onComplete();
     });
   }
 
   @override
   void dispose() {
+    _delayTimer?.cancel();
+    for (final t in _dotTimers) {
+      t.cancel();
+    }
+    _completeTimer?.cancel();
     _popCtrl.dispose();
-    for (final c in _dotCtrls) c.dispose();
+    for (final c in _dotCtrls) {
+      c.dispose();
+    }
     super.dispose();
   }
 

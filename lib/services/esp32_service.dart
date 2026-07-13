@@ -23,10 +23,6 @@ class Esp32Service {
   static Future<void> openDoor() => _get('/openDoor');
   static Future<void> closeDoor() => _get('/closeDoor');
 
-  // ── Feeder ────────────────────────────────────────────────────────────────
-  static Future<void> openFeeder() => _get('/openFeeder');
-  static Future<void> closeFeeder() => _get('/closeFeeder');
-
   // ── Water ─────────────────────────────────────────────────────────────────
   static Future<void> fillWater() => _get('/fillWater');
   static Future<void> emptyWater() => _get('/emptyWater');
@@ -43,12 +39,33 @@ class Esp32Service {
   static FarmState _parseStatus(Map<String, dynamic> json) {
     return FarmState(
       connected: json['connected'] as bool? ?? true,
-      doorState: json['door'] == 'open' ? DoorState.open : DoorState.closed,
-      feederState: json['feeder'] == 'open' ? FeederState.open : FeederState.closed,
-      waterState: _parseWater(json['water'] as String?),
-      animalDetected: json['animalDetected'] as bool? ?? false,
-      alarmActive: json['alarm'] as bool? ?? false,
       lastUpdate: DateTime.now(),
+      doorState: json['door'] == 'open' ? DoorState.open : DoorState.closed,
+      doorOpenCount: (json['doorOpenCount'] as int?) ?? 0,
+      doorOpenSeconds: (json['doorOpenSeconds'] as int?) ?? 0,
+      doorLastUser: (json['doorLastUser'] as String?) ?? 'Sistema',
+      waterState: _parseWater(json['water'] as String?),
+      waterPercent: (json['waterPercent'] as num?)?.toDouble() ?? 50.0,
+      waterCapacityL: (json['waterCapacityL'] as num?)?.toDouble() ?? 50.0,
+      waterDailyConsumptionL: (json['waterDailyConsumptionL'] as num?)?.toDouble() ?? 12.0,
+      valveOpen: json['valveOpen'] as bool? ?? false,
+      animalDetected: json['animalDetected'] as bool? ?? false,
+      lastMotionTime: json['lastMotionTime'] != null
+          ? DateTime.tryParse(json['lastMotionTime'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      pirEventsToday: (json['pirEventsToday'] as int?) ?? 0,
+      alarmActive: json['alarm'] as bool? ?? false,
+      operationMode: OperationMode.automatic,
+      hitlPendingWater: false,
+      voltageV: (json['voltageV'] as num?)?.toDouble() ?? 3.28,
+      esp32TempC: (json['esp32TempC'] as num?)?.toDouble() ?? 42.0,
+      cpuUsagePercent: (json['cpuUsagePercent'] as int?) ?? 15,
+      memoryUsedKb: (json['memoryUsedKb'] as int?) ?? 200,
+      memoryTotalKb: (json['memoryTotalKb'] as int?) ?? 520,
+      latencyMs: (json['latencyMs'] as int?) ?? 20,
+      wifiRssi: (json['wifiRssi'] as int?) ?? -62,
+      notifications: const [],
+      auditLog: const [],
       events: const [],
     );
   }

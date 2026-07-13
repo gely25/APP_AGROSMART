@@ -12,13 +12,6 @@ class InfoScreen extends StatelessWidget {
     (Icons.code_outlined, 'Arduino IDE'),
   ];
 
-  static const _team = [
-    'Integrante 1',
-    'Integrante 2',
-    'Integrante 3',
-    'Integrante 4',
-  ];
-
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -70,64 +63,76 @@ class InfoScreen extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Description
+          // Acerca de SmartFarm
           _InfoBlock(
-            title: 'Descripción',
+            title: 'Acerca de SmartFarm',
             child: const Text(
-              'Aplicación de monitoreo y control en tiempo real de un corral pecuario automatizado. '
-              'Permite operar la puerta, el comedero y el bebedero, y recibir alertas del sistema '
-              'mediante un ESP32 conectado por WiFi.',
+              'Plataforma profesional de monitoreo y control en tiempo real para la automatización '
+              'de corrales pecuarios. Permite gestionar de forma remota y local el estado de puertas, '
+              'bebederos y sensores de movimiento, mejorando la eficiencia y el bienestar animal.',
               style: TextStyle(fontSize: 13, height: 1.6, color: AppColors.mutedForeground),
             ),
           ),
 
           const SizedBox(height: 12),
 
-          // University
+          // Firmware ESP32
           _InfoBlock(
-            title: 'Universidad',
+            title: 'Firmware ESP32',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('Universidad — Ingeniería',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.foreground)),
-                SizedBox(height: 2),
-                Text('Proyecto académico IoT',
-                  style: TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
+                Text('Versión del Firmware: v1.0.0',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.foreground)),
+                SizedBox(height: 4),
+                Text('Protocolo de comunicación: HTTP REST API sobre red WiFi local. '
+                    'Para sincronizar el dispositivo, asegúrese de que el ESP32 esté en la misma subred '
+                    'y configure la dirección IP de conexión en los ajustes de red.',
+                  style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.mutedForeground)),
               ],
             ),
           ),
 
           const SizedBox(height: 12),
 
-          // Team
+          // Información del sistema
           _InfoBlock(
-            title: 'Integrantes',
+            title: 'Información del sistema',
             child: Column(
-              children: _team.map((name) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 28, height: 28,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        name[name.length - 1],
-                        style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(name,
-                      style: const TextStyle(fontSize: 14, color: AppColors.foreground)),
-                  ],
-                ),
-              )).toList(),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _InfoRow(label: 'Arquitectura', value: 'Flutter (Dart) / C++ ESP32'),
+                SizedBox(height: 8),
+                _InfoRow(label: 'Gestor de Estado', value: 'Provider ^6.1.2'),
+                SizedBox(height: 8),
+                _InfoRow(label: 'Estilo visual', value: 'Material Design 3'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Licencia
+          _InfoBlock(
+            title: 'Licencia',
+            child: const Text(
+              'Software bajo licencia comercial propietaria de SmartFarm. '
+              'Todos los derechos reservados. Queda prohibida la reproducción, distribución o '
+              'modificación no autorizada de este código fuente.',
+              style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.mutedForeground),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Política de privacidad
+          _InfoBlock(
+            title: 'Política de privacidad',
+            child: const Text(
+              'Esta aplicación no recopila ni transmite datos personales fuera de la red local. '
+              'Todas las lecturas y comandos se procesan en tiempo real entre el dispositivo móvil '
+              'y el microcontrolador ESP32 de forma directa y cifrada en su red privada local.',
+              style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.mutedForeground),
             ),
           ),
 
@@ -197,6 +202,24 @@ class _InfoBlock extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground)),
+        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.foreground)),
+      ],
     );
   }
 }
