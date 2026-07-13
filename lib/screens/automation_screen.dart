@@ -293,11 +293,15 @@ class _RuleCard extends StatelessWidget {
                       // Condition → Action
                       Row(
                         children: [
-                          _ConditionPill(label: 'SI: ${rule.conditionLabel}', color: AppColors.warning),
+                          Flexible(
+                            child: _ConditionPill(label: 'SI: ${rule.conditionLabel}', color: AppColors.warning),
+                          ),
                           const SizedBox(width: 4),
                           const Icon(Icons.arrow_forward_rounded, size: 10, color: AppColors.mutedForeground),
                           const SizedBox(width: 4),
-                          _ConditionPill(label: 'ENTONCES: ${rule.actionLabel}', color: AppColors.success),
+                          Flexible(
+                            child: _ConditionPill(label: 'ENTONCES: ${rule.actionLabel}', color: AppColors.success),
+                          ),
                         ],
                       ),
                       if (rule.requiresHITL) ...[
@@ -508,7 +512,11 @@ class _ScheduleCard extends StatelessWidget {
                   children: [
                     Icon(_actionIcon, size: 11, color: AppColors.primary),
                     const SizedBox(width: 4),
-                    Text(_actionLabel, style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground)),
+                    Flexible(
+                      child: Text(_actionLabel,
+                          style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),

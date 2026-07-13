@@ -42,7 +42,7 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   StatusCard(
                     icon: s.connected ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-                    title: 'Conexión ESP32',
+                    title: 'Conexión',
                     value: s.connected ? 'Conectado' : 'Sin conexión',
                     tone: s.connected ? StatusTone.success : StatusTone.alert,
                   ),
@@ -105,9 +105,9 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // ── ESP32 Telemetría ──────────────────────────────────────────
-              _SectionLabel('ESTADO ESP32'),
+              _SectionLabel('ESTADO DEL CONTROLADOR'),
               const SizedBox(height: 10),
-              _Esp32Card(state: s, uptime: provider.uptime, lastSync: timeStr),
+              _ControladorCard(state: s, uptime: provider.uptime, lastSync: timeStr),
               const SizedBox(height: 16),
 
               // ── Mini Charts ───────────────────────────────────────────────
@@ -334,13 +334,13 @@ class _QuickStatBox extends StatelessWidget {
   }
 }
 
-// ── ESP32 Card ───────────────────────────────────────────────────────────────
+// ── Controlador Card ─────────────────────────────────────────────────────────
 
-class _Esp32Card extends StatelessWidget {
+class _ControladorCard extends StatelessWidget {
   final FarmState state;
   final String uptime;
   final String lastSync;
-  const _Esp32Card({required this.state, required this.uptime, required this.lastSync});
+  const _ControladorCard({required this.state, required this.uptime, required this.lastSync});
 
   @override
   Widget build(BuildContext context) {
@@ -371,10 +371,10 @@ class _Esp32Card extends StatelessWidget {
         children: [
           Row(
             children: [
-              _Esp32Metric(label: 'RSSI', value: '${state.wifiRssi}dBm', color: rssiColor(state.wifiRssi)),
-              _Esp32Metric(label: 'Latencia', value: '${state.latencyMs}ms', color: latencyColor(state.latencyMs)),
-              _Esp32Metric(label: 'Voltaje', value: '${state.voltageV.toStringAsFixed(2)}V', color: voltageColor(state.voltageV)),
-              _Esp32Metric(label: 'Firmware', value: 'v1.0.0', color: AppColors.foreground),
+              _ControladorMetric(label: 'RSSI', value: '${state.wifiRssi}dBm', color: rssiColor(state.wifiRssi)),
+              _ControladorMetric(label: 'Latencia', value: '${state.latencyMs}ms', color: latencyColor(state.latencyMs)),
+              _ControladorMetric(label: 'Voltaje', value: '${state.voltageV.toStringAsFixed(2)}V', color: voltageColor(state.voltageV)),
+              _ControladorMetric(label: 'Firmware', value: 'v1.0.0', color: AppColors.foreground),
             ],
           ),
           const SizedBox(height: 12),
@@ -397,11 +397,11 @@ class _Esp32Card extends StatelessWidget {
   }
 }
 
-class _Esp32Metric extends StatelessWidget {
+class _ControladorMetric extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _Esp32Metric({required this.label, required this.value, required this.color});
+  const _ControladorMetric({required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {

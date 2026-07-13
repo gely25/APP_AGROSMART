@@ -157,6 +157,17 @@ class CorralInfo {
   final int rssi;
   final double availability;
 
+  // Estado del controlador (para "Mis Corrales" y el Centro de Dispositivos)
+  final bool connected;
+  final DateTime lastSyncAt;
+  final int eventCount;
+
+  // Dispositivos del corral. Hoy normalmente 1 de cada uno, pero la lista
+  // permite escalar a "+ Nueva puerta / + Nuevo bebedero / + Nuevo sensor".
+  final List<DoorDevice> doors;
+  final List<WatererDevice> waterers;
+  final List<SensorDevice> sensors;
+
   const CorralInfo({
     required this.id,
     required this.name,
@@ -166,6 +177,12 @@ class CorralInfo {
     required this.firmware,
     required this.rssi,
     required this.availability,
+    this.connected = true,
+    required this.lastSyncAt,
+    this.eventCount = 0,
+    this.doors = const [],
+    this.waterers = const [],
+    this.sensors = const [],
   });
 
   CorralInfo copyWith({
@@ -174,6 +191,12 @@ class CorralInfo {
     String? ip,
     int? rssi,
     double? availability,
+    bool? connected,
+    DateTime? lastSyncAt,
+    int? eventCount,
+    List<DoorDevice>? doors,
+    List<WatererDevice>? waterers,
+    List<SensorDevice>? sensors,
   }) => CorralInfo(
     id: id,
     name: name ?? this.name,
@@ -183,6 +206,12 @@ class CorralInfo {
     firmware: firmware,
     rssi: rssi ?? this.rssi,
     availability: availability ?? this.availability,
+    connected: connected ?? this.connected,
+    lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+    eventCount: eventCount ?? this.eventCount,
+    doors: doors ?? this.doors,
+    waterers: waterers ?? this.waterers,
+    sensors: sensors ?? this.sensors,
   );
 }
 
@@ -194,6 +223,138 @@ class FarmEvent {
   final DateTime at;
 
   const FarmEvent({required this.id, required this.label, required this.at});
+}
+
+// ── Device Models (multi-corral / multi-device architecture) ──────────────
+//
+// Cada Corral puede tener varias puertas, bebederos y sensores. Hoy solo
+// existe un dispositivo funcional de cada tipo (ver FarmProvider), pero el
+// modelo ya soporta listas para escalar sin volver a romper la arquitectura.
+
+class DoorDevice {
+  final String id;
+  final String name;
+  final DoorState state;
+  final OperationMode mode;
+  final int openCount;
+  final int openSeconds;
+  final String lastUser;
+  final DateTime? lastOpenedAt;
+
+  const DoorDevice({
+    required this.id,
+    required this.name,
+    required this.state,
+    required this.mode,
+    required this.openCount,
+    required this.openSeconds,
+    required this.lastUser,
+    this.lastOpenedAt,
+  });
+
+  DoorDevice copyWith({
+    DoorState? state,
+    OperationMode? mode,
+    int? openCount,
+    int? openSeconds,
+    String? lastUser,
+    DateTime? lastOpenedAt,
+  }) => DoorDevice(
+    id: id,
+    name: name,
+    state: state ?? this.state,
+    mode: mode ?? this.mode,
+    openCount: openCount ?? this.openCount,
+    openSeconds: openSeconds ?? this.openSeconds,
+    lastUser: lastUser ?? this.lastUser,
+    lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
+  );
+}
+
+class WatererDevice {
+  final String id;
+  final String name;
+  final WaterState state;
+  final double percent; // 0..100
+  final double capacityL;
+  final double dailyConsumptionL;
+  final bool valveOpen;
+  final DateTime? lastFilledAt;
+
+  const WatererDevice({
+    required this.id,
+    required this.name,
+    required this.state,
+    required this.percent,
+    required this.capacityL,
+    required this.dailyConsumptionL,
+    required this.valveOpen,
+    this.lastFilledAt,
+  });
+
+  double get liters => capacityL * percent / 100;
+  bool get low => percent < 20;
+
+  /// Estimated hours remaining until this waterer hits 10%
+  double get autonomyHours {
+    if (dailyConsumptionL <= 0) return 999;
+    final remaining = liters - (capacityL * 0.10);
+    if (remaining <= 0) return 0;
+    return (remaining / dailyConsumptionL) * 24;
+  }
+
+  WatererDevice copyWith({
+    WaterState? state,
+    double? percent,
+    double? capacityL,
+    double? dailyConsumptionL,
+    bool? valveOpen,
+    DateTime? lastFilledAt,
+  }) => WatererDevice(
+    id: id,
+    name: name,
+    state: state ?? this.state,
+    percent: percent ?? this.percent,
+    capacityL: capacityL ?? this.capacityL,
+    dailyConsumptionL: dailyConsumptionL ?? this.dailyConsumptionL,
+    valveOpen: valveOpen ?? this.valveOpen,
+    lastFilledAt: lastFilledAt ?? this.lastFilledAt,
+  );
+}
+
+class SensorDevice {
+  final String id;
+  final String name;
+  final String zone;
+  final bool detected;
+  final DateTime lastMotionTime;
+  final int eventsToday;
+  final int sensitivity; // 0..100
+
+  const SensorDevice({
+    required this.id,
+    required this.name,
+    required this.zone,
+    required this.detected,
+    required this.lastMotionTime,
+    required this.eventsToday,
+    required this.sensitivity,
+  });
+
+  SensorDevice copyWith({
+    bool? detected,
+    DateTime? lastMotionTime,
+    int? eventsToday,
+    int? sensitivity,
+  }) => SensorDevice(
+    id: id,
+    name: name,
+    zone: zone,
+    detected: detected ?? this.detected,
+    lastMotionTime: lastMotionTime ?? this.lastMotionTime,
+    eventsToday: eventsToday ?? this.eventsToday,
+    sensitivity: sensitivity ?? this.sensitivity,
+  );
 }
 
 // ── Main FarmState ─────────────────────────────────────────────────────────

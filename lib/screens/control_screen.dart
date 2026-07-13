@@ -695,8 +695,15 @@ class _MetricRow extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: AppColors.mutedForeground),
         const SizedBox(width: 8),
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
-        const Spacer(),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(value, style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,

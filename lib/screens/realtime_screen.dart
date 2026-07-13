@@ -36,7 +36,7 @@ class RealtimeScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(
-                        'Sincronización automática cada 5 segundos con el ESP32',
+                        'Sincronización automática cada 5 segundos con el controlador',
                         style: TextStyle(fontSize: 12, color: AppColors.info),
                       ),
                     ),
@@ -142,7 +142,7 @@ class RealtimeScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Demo alarm trigger (only if no alarm)
+              // Activación manual de alarma (solo si no hay una activa)
               if (!s.alarmActive)
                 GestureDetector(
                   onTap: provider.triggerAlarm,
@@ -159,7 +159,7 @@ class RealtimeScreen extends StatelessWidget {
                     ),
                     alignment: Alignment.center,
                     child: const Text(
-                      'Simular alerta del ESP32 (demostración)',
+                      'Activar alarma manualmente',
                       style: TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w500,
                         color: AppColors.destructive,

@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/farm_provider.dart';
 import 'screens/splash_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/corrales_screen.dart';
-import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -36,23 +34,7 @@ class _SmartFarmAppState extends State<SmartFarmApp> {
       debugShowCheckedModeBanner: false,
       home: _showSplash
           ? SplashScreen(onComplete: () => setState(() => _showSplash = false))
-          : const _AuthGate(),
-    );
-  }
-}
-
-class _AuthGate extends StatelessWidget {
-  const _AuthGate();
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<FarmProvider>(
-      builder: (_, provider, __) {
-        if (!provider.isLoggedIn) {
-          return LoginScreen(onLogin: () {});
-        }
-        return const CorralesScreen();
-      },
+          : const CorralesScreen(),
     );
   }
 }

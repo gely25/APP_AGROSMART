@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/farm_provider.dart';
-import '../screens/corrales_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -40,13 +39,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _ProfileHeader(
                 userName: provider.userName,
                 corralName: corral?.name ?? 'Sin corral',
-                onLogout: () {
-                  provider.logout();
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const CorralesScreen()),
-                    (route) => false,
-                  );
-                },
               ),
               const SizedBox(height: 20),
 
@@ -109,21 +101,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: AppColors.info,
                   onTap: () => _showConfirmDialog(
                     context, 'Actualizar firmware',
-                    'Se verificará la disponibilidad de actualizaciones. En modo demo, esta acción es simulada.',
+                    'Se verificará la disponibilidad de actualizaciones para el controlador.',
                     () => ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Firmware ya está actualizado (v1.0.0)'), behavior: SnackBarBehavior.floating),
                     ),
                   ),
                 ),
                 _SettingsAction(
-                  label: 'Reiniciar ESP32',
+                  label: 'Reiniciar controlador',
                   icon: Icons.restart_alt_rounded,
                   color: AppColors.warning,
                   onTap: () => _showConfirmDialog(
-                    context, 'Reiniciar ESP32',
+                    context, 'Reiniciar controlador',
                     '¿Deseas reiniciar el microcontrolador? La conexión se interrumpirá por unos segundos.',
                     () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('ESP32 reiniciado (simulado)'), behavior: SnackBarBehavior.floating),
+                      const SnackBar(content: Text('Dispositivo reiniciado'), behavior: SnackBarBehavior.floating),
                     ),
                   ),
                 ),
@@ -267,9 +259,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 class _ProfileHeader extends StatelessWidget {
   final String userName;
   final String corralName;
-  final VoidCallback onLogout;
 
-  const _ProfileHeader({required this.userName, required this.corralName, required this.onLogout});
+  const _ProfileHeader({required this.userName, required this.corralName});
 
   @override
   Widget build(BuildContext context) {
@@ -306,14 +297,6 @@ class _ProfileHeader extends StatelessWidget {
                   ],
                 ),
               ],
-            ),
-          ),
-          OutlinedButton.icon(
-            onPressed: onLogout,
-            icon: const Icon(Icons.logout_rounded, size: 14),
-            label: const Text('Salir'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
           ),
         ],
@@ -366,10 +349,23 @@ class _SettingsInfo extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       child: Row(
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.foreground)),
-          const Spacer(),
-          Text(value, style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground, fontWeight: FontWeight.w500),
-              maxLines: 1, overflow: TextOverflow.ellipsis),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: AppColors.foreground),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground, fontWeight: FontWeight.w500),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

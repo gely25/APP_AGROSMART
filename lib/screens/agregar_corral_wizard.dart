@@ -91,6 +91,8 @@ class _AgregarCorralWizardState extends State<AgregarCorralWizard>
       firmware: 'v1.0.0',
       rssi: -60 - Random().nextInt(20),
       availability: 99.0,
+      connected: true,
+      lastSyncAt: DateTime.now(),
     ));
     Navigator.of(context).pop();
   }
@@ -252,7 +254,7 @@ class _StepScan extends StatelessWidget {
   Widget build(BuildContext context) {
     return _StepScaffold(
       icon: Icons.radar_rounded,
-      title: 'Buscar dispositivo ESP32',
+      title: 'Buscar controlador',
       subtitle: 'Paso 2 de 5 — Escaneo de red',
       content: Column(
         children: [
@@ -303,10 +305,10 @@ class _StepScan extends StatelessWidget {
             Text('Escaneando red WiFi... ${(progress * 100).toInt()}%',
                 style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
           ] else if (found) ...[
-            const Text('¡ESP32 encontrado en la red!',
+            const Text('¡Controlador encontrado en la red!',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.success)),
           ] else ...[
-            const Text('Presiona "Escanear" para buscar dispositivos ESP32 en tu red WiFi local.',
+            const Text('Presiona "Escanear" para buscar controladores en tu red WiFi local.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: AppColors.mutedForeground)),
           ],
@@ -342,7 +344,7 @@ class _StepEsp32Info extends StatelessWidget {
     return _StepScaffold(
       icon: Icons.memory_rounded,
       title: 'Dispositivo encontrado',
-      subtitle: 'Paso 3 de 5 — Información del ESP32',
+      subtitle: 'Paso 3 de 5 — Información del controlador',
       content: Column(
         children: [
           _Esp32InfoRow(label: 'Dirección MAC', value: mac, icon: Icons.fingerprint_rounded),

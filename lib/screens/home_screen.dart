@@ -83,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              provider.state.connected ? 'ESP32 conectado' : 'Sin conexión',
+                              provider.state.connected ? 'Controlador conectado' : 'Sin conexión',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: provider.state.connected ? AppColors.success : AppColors.destructive,

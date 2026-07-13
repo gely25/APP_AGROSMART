@@ -215,10 +215,20 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground)),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.foreground)),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.foreground),
+        ),
       ],
     );
   }

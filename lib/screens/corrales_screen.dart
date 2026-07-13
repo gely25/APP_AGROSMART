@@ -222,19 +222,7 @@ class _CorralesScreenState extends State<CorralesScreen> {
             const SizedBox(height: 12),
             Text(provider.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const Text('Operador', style: TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  provider.logout();
-                },
-                icon: const Icon(Icons.logout_rounded, size: 16),
-                label: const Text('Cerrar sesión'),
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -365,7 +353,7 @@ class _CorralCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _DataCell(label: 'ESP32', value: corral.macAddress.split(':').take(3).join(':') + '...', icon: Icons.memory_rounded),
+                    _DataCell(label: 'Controlador', value: corral.macAddress.split(':').take(3).join(':') + '...', icon: Icons.memory_rounded),
                     _DataCell(label: 'Firmware', value: corral.firmware, icon: Icons.system_update_alt_rounded),
                     _DataCell(label: 'RSSI', value: '${corral.rssi}dBm', icon: Icons.wifi_rounded, valueColor: _rssiColor),
                   ],

@@ -96,7 +96,7 @@ final _defaultSchedules = [
 // ── Default corrales ───────────────────────────────────────────────────────
 
 final _defaultCorrales = [
-  const CorralInfo(
+  CorralInfo(
     id: 'corral_01',
     name: 'Corral Principal',
     description: 'Corral de bovinos — Zona norte',
@@ -105,6 +105,44 @@ final _defaultCorrales = [
     firmware: 'v1.0.0',
     rssi: -62,
     availability: 99.8,
+    connected: true,
+    lastSyncAt: DateTime.now(),
+    eventCount: 7,
+    doors: [
+      DoorDevice(
+        id: 'door_01',
+        name: 'Puerta Principal',
+        state: DoorState.closed,
+        mode: OperationMode.automatic,
+        openCount: 3,
+        openSeconds: 240,
+        lastUser: 'Sistema',
+        lastOpenedAt: DateTime.now().subtract(const Duration(minutes: 45)),
+      ),
+    ],
+    waterers: [
+      WatererDevice(
+        id: 'water_01',
+        name: 'Bebedero Principal',
+        state: WaterState.full,
+        percent: 85.0,
+        capacityL: 50.0,
+        dailyConsumptionL: 12.0,
+        valveOpen: false,
+        lastFilledAt: DateTime.now().subtract(const Duration(hours: 2)),
+      ),
+    ],
+    sensors: [
+      SensorDevice(
+        id: 'sensor_01',
+        name: 'Sensor PIR',
+        zone: 'Entrada principal',
+        detected: false,
+        lastMotionTime: DateTime.now().subtract(const Duration(minutes: 8)),
+        eventsToday: 7,
+        sensitivity: 70,
+      ),
+    ],
   ),
 ];
 
@@ -114,10 +152,8 @@ class FarmProvider extends ChangeNotifier {
   final DateTime _startTime = DateTime.now();
   final _rng = Random();
 
-  // Auth (simulated)
-  bool _isLoggedIn = false;
-  String _userName = 'Operador';
-  bool get isLoggedIn => _isLoggedIn;
+  // Operador activo (sin flujo de inicio de sesión)
+  final String _userName = 'Operador';
   String get userName => _userName;
 
   // Corrales list
@@ -328,24 +364,6 @@ class FarmProvider extends ChangeNotifier {
     return '${m}m ${s}s';
   }
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
-
-  Future<bool> login(String username, String password) async {
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (username.isNotEmpty && password.isNotEmpty) {
-      _userName = username;
-      _isLoggedIn = true;
-      notifyListeners();
-      return true;
-    }
-    return false;
-  }
-
-  void logout() {
-    _isLoggedIn = false;
-    notifyListeners();
-  }
-
   // ── Corrales ──────────────────────────────────────────────────────────────
 
   void selectCorral(String id) {
@@ -364,6 +382,47 @@ class FarmProvider extends ChangeNotifier {
       _activeCorralId = _corrales.isNotEmpty ? _corrales.first.id : null;
     }
     notifyListeners();
+  }
+
+  // ── Corral devices (Centro de Dispositivos — base para la Fase 3) ─────────
+
+  List<DoorDevice> get activeDoors => activeCorral?.doors ?? const [];
+  List<WatererDevice> get activeWaterers => activeCorral?.waterers ?? const [];
+  List<SensorDevice> get activeSensors => activeCorral?.sensors ?? const [];
+
+  void _replaceCorral(String corralId, CorralInfo Function(CorralInfo) update) {
+    _corrales = _corrales.map((c) => c.id == corralId ? update(c) : c).toList();
+    notifyListeners();
+  }
+
+  void addDoorDevice(String corralId, DoorDevice door) {
+    _replaceCorral(corralId, (c) => c.copyWith(doors: [...c.doors, door]));
+  }
+
+  void addWatererDevice(String corralId, WatererDevice waterer) {
+    _replaceCorral(corralId, (c) => c.copyWith(waterers: [...c.waterers, waterer]));
+  }
+
+  void addSensorDevice(String corralId, SensorDevice sensor) {
+    _replaceCorral(corralId, (c) => c.copyWith(sensors: [...c.sensors, sensor]));
+  }
+
+  void updateDoorDevice(String corralId, String doorId, DoorDevice Function(DoorDevice) update) {
+    _replaceCorral(corralId, (c) => c.copyWith(
+      doors: c.doors.map((d) => d.id == doorId ? update(d) : d).toList(),
+    ));
+  }
+
+  void updateWatererDevice(String corralId, String watererId, WatererDevice Function(WatererDevice) update) {
+    _replaceCorral(corralId, (c) => c.copyWith(
+      waterers: c.waterers.map((w) => w.id == watererId ? update(w) : w).toList(),
+    ));
+  }
+
+  void updateSensorDevice(String corralId, String sensorId, SensorDevice Function(SensorDevice) update) {
+    _replaceCorral(corralId, (c) => c.copyWith(
+      sensors: c.sensors.map((s) => s.id == sensorId ? update(s) : s).toList(),
+    ));
   }
 
   // ── Door Actions ──────────────────────────────────────────────────────────

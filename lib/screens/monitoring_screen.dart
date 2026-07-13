@@ -380,9 +380,19 @@ class _DiagRow extends StatelessWidget {
             decoration: BoxDecoration(color: _color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 12),
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
-          const Spacer(),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.foreground)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.foreground),
+          ),
         ],
       ),
     );
