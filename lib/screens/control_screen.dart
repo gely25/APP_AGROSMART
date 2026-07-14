@@ -27,6 +27,10 @@ class ControlScreen extends StatelessWidget {
               _ModeSelector(mode: s.operationMode, onChanged: provider.setMode),
               const SizedBox(height: 12),
 
+              // Mode info banner
+              _ModeBanner(mode: s.operationMode),
+              const SizedBox(height: 12),
+
               // Alarm card
               AlarmCard(alarmActive: s.alarmActive, onSilence: provider.silenceAlarm),
               const SizedBox(height: 14),
@@ -37,6 +41,12 @@ class ControlScreen extends StatelessWidget {
                   onApprove: () => provider.approveWaterFill(),
                   onReject: () => provider.rejectWaterFill(),
                 ),
+                const SizedBox(height: 14),
+              ],
+
+              // HITL: Thresholds editor
+              if (s.operationMode == OperationMode.humanInTheLoop) ...[
+                _ThresholdEditor(provider: provider),
                 const SizedBox(height: 14),
               ],
 
@@ -113,6 +123,82 @@ class _ModeSelector extends StatelessWidget {
   }
 }
 
+// ── Mode Banner ───────────────────────────────────────────────────────────────
+
+class _ModeBanner extends StatelessWidget {
+  final OperationMode mode;
+  const _ModeBanner({required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (mode) {
+      case OperationMode.manual:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.infoLight,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.info.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: const [
+              Icon(Icons.pan_tool_outlined, size: 15, color: AppColors.info),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Modo Manual — Controlas directamente cada dispositivo.',
+                  style: TextStyle(fontSize: 11, color: AppColors.info, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        );
+      case OperationMode.automatic:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.successLight,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.success.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: const [
+              Icon(Icons.auto_fix_high_outlined, size: 15, color: AppColors.success),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Modo Automático — El sistema gestiona los dispositivos según los umbrales configurados.',
+                  style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        );
+      case OperationMode.humanInTheLoop:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.warningBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: const [
+              Icon(Icons.supervised_user_circle_outlined, size: 15, color: AppColors.warning),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Modo HITL — El sistema sugiere acciones pero tú apruebas o rechazas cada una. Configura umbrales aquí.',
+                  style: TextStyle(fontSize: 11, color: AppColors.warning, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        );
+    }
+  }
+}
+
 // ── HITL Approval Banner ─────────────────────────────────────────────────────
 
 class _HitlApprovalBanner extends StatelessWidget {
@@ -175,6 +261,237 @@ class _HitlApprovalBanner extends StatelessWidget {
   }
 }
 
+// ── HITL Threshold Editor ─────────────────────────────────────────────────────
+
+class _ThresholdEditor extends StatefulWidget {
+  final FarmProvider provider;
+  const _ThresholdEditor({required this.provider});
+
+  @override
+  State<_ThresholdEditor> createState() => _ThresholdEditorState();
+}
+
+class _ThresholdEditorState extends State<_ThresholdEditor> {
+  late double _critical;
+  late double _low;
+  late double _normal;
+  bool _dirty = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _critical = widget.provider.waterCriticalThreshold;
+    _low = widget.provider.waterLowThreshold;
+    _normal = widget.provider.waterNormalThreshold;
+  }
+
+  void _save() {
+    widget.provider.updateThresholds(
+      critical: _critical,
+      low: _low,
+      normal: _normal,
+    );
+    setState(() => _dirty = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Umbrales actualizados'), duration: Duration(seconds: 2)),
+    );
+  }
+
+  void _reset() {
+    widget.provider.resetThresholds();
+    setState(() {
+      _critical = widget.provider.waterCriticalThreshold;
+      _low = widget.provider.waterLowThreshold;
+      _normal = widget.provider.waterNormalThreshold;
+      _dirty = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.warning.withOpacity(0.35), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.warningBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.tune_rounded, size: 18, color: AppColors.warning),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Umbrales HITL', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text('Configura cuándo el sistema solicita tu aprobación',
+                        style: TextStyle(fontSize: 11, color: AppColors.mutedForeground)),
+                  ],
+                ),
+              ),
+              if (_dirty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningBg,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text('Sin guardar',
+                      style: TextStyle(fontSize: 9, color: AppColors.warning, fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Sliders
+          _ThresholdSlider(
+            label: 'Nivel crítico de agua',
+            icon: Icons.warning_amber_rounded,
+            iconColor: AppColors.destructive,
+            value: _critical,
+            min: 5,
+            max: 30,
+            unit: '%',
+            onChanged: (v) => setState(() { _critical = v; _dirty = true; }),
+          ),
+          const SizedBox(height: 14),
+          _ThresholdSlider(
+            label: 'Nivel bajo de agua',
+            icon: Icons.water_drop_outlined,
+            iconColor: AppColors.warning,
+            value: _low,
+            min: 15,
+            max: 50,
+            unit: '%',
+            onChanged: (v) => setState(() { _low = v; _dirty = true; }),
+          ),
+          const SizedBox(height: 14),
+          _ThresholdSlider(
+            label: 'Nivel objetivo de llenado',
+            icon: Icons.water_drop_rounded,
+            iconColor: AppColors.success,
+            value: _normal,
+            min: 60,
+            max: 100,
+            unit: '%',
+            onChanged: (v) => setState(() { _normal = v; _dirty = true; }),
+          ),
+
+          const SizedBox(height: 16),
+          // Actions
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _dirty ? _save : null,
+                  icon: const Icon(Icons.save_rounded, size: 14),
+                  label: const Text('Guardar'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    backgroundColor: AppColors.warning,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppColors.muted,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _reset,
+                icon: const Icon(Icons.restart_alt_rounded, size: 14),
+                label: const Text('Restablecer'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThresholdSlider extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color iconColor;
+  final double value;
+  final double min;
+  final double max;
+  final String unit;
+  final ValueChanged<double> onChanged;
+
+  const _ThresholdSlider({
+    required this.label,
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.unit,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 14, color: iconColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('${value.toStringAsFixed(0)}$unit',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: iconColor)),
+            ),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: iconColor,
+            thumbColor: iconColor,
+            overlayColor: iconColor.withOpacity(0.15),
+            inactiveTrackColor: AppColors.border,
+            trackHeight: 3,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+          ),
+          child: Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            divisions: ((max - min) / 5).round(),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Door Module ──────────────────────────────────────────────────────────────
 
 class _DoorModule extends StatelessWidget {
@@ -189,6 +506,68 @@ class _DoorModule extends StatelessWidget {
         : 'Nunca';
     final openMins = state.doorOpenSeconds ~/ 60;
 
+    final metrics = [
+      _MetricRow(icon: Icons.door_sliding_outlined, label: 'Aperturas hoy', value: '${state.doorOpenCount}'),
+      _MetricRow(icon: Icons.timer_outlined, label: 'Tiempo abierta', value: '${openMins}min'),
+      _MetricRow(icon: Icons.access_time_rounded, label: 'Última apertura', value: lastOpenedStr),
+      _MetricRow(icon: Icons.person_outline_rounded, label: 'Operado por', value: state.doorLastUser),
+    ];
+
+    Widget actions;
+    switch (state.operationMode) {
+      case OperationMode.manual:
+        actions = Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: state.doorState == DoorState.closed
+                    ? () => provider.openDoor(user: 'Operador', origin: 'Manual')
+                    : null,
+                icon: const Icon(Icons.lock_open_rounded, size: 14),
+                label: const Text('Abrir'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: state.doorState == DoorState.open
+                    ? () => provider.closeDoor(user: 'Operador', origin: 'Manual')
+                    : null,
+                icon: const Icon(Icons.lock_rounded, size: 14),
+                label: const Text('Cerrar'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.muted,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Center(
+                child: Icon(Icons.stop_circle_outlined, size: 16, color: AppColors.mutedForeground),
+              ),
+            ),
+          ],
+        );
+        break;
+      case OperationMode.automatic:
+        actions = _AutoInfoRow(
+          icon: Icons.auto_fix_high_outlined,
+          text: 'La puerta se opera automáticamente según el calendario y las reglas configuradas.',
+        );
+        break;
+      case OperationMode.humanInTheLoop:
+        actions = _HitlActionRow(
+          label: 'Revisar y decidir',
+          icon: Icons.supervised_user_circle_outlined,
+          onTap: () => _showDoorHitlSheet(context),
+        );
+        break;
+    }
+
     return _ControlCard(
       icon: state.doorState == DoorState.open
           ? Icons.door_back_door_outlined
@@ -198,45 +577,80 @@ class _DoorModule extends StatelessWidget {
       stateLabel: state.doorState == DoorState.open ? 'Abierta' : 'Cerrada',
       stateTone: state.doorState == DoorState.open ? _Tone.success : _Tone.neutral,
       animation: DoorAnimation(doorState: state.doorState),
-      metrics: [
-        _MetricRow(icon: Icons.door_sliding_outlined, label: 'Aperturas hoy', value: '${state.doorOpenCount}'),
-        _MetricRow(icon: Icons.timer_outlined, label: 'Tiempo abierta', value: '${openMins}min'),
-        _MetricRow(icon: Icons.access_time_rounded, label: 'Última apertura', value: lastOpenedStr),
-        _MetricRow(icon: Icons.person_outline_rounded, label: 'Operado por', value: state.doorLastUser),
-      ],
-      actions: Row(
+      metrics: metrics,
+      actions: actions,
+    );
+  }
+
+  void _showDoorHitlSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _DoorHitlSheet(state: state, provider: provider),
+    );
+  }
+}
+
+class _DoorHitlSheet extends StatelessWidget {
+  final FarmState state;
+  final FarmProvider provider;
+  const _DoorHitlSheet({required this.state, required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: state.doorState == DoorState.closed
-                  ? () => provider.openDoor(user: 'Operador', origin: 'Manual')
-                  : null,
-              icon: const Icon(Icons.lock_open_rounded, size: 14),
-              label: const Text('Abrir'),
-            ),
+          Row(
+            children: [
+              const Icon(Icons.supervised_user_circle_outlined, color: AppColors.warning),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Puerta — Decisión HITL',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: state.doorState == DoorState.open
-                  ? () => provider.closeDoor(user: 'Operador', origin: 'Manual')
-                  : null,
-              icon: const Icon(Icons.lock_rounded, size: 14),
-              label: const Text('Cerrar'),
-            ),
+          const SizedBox(height: 4),
+          Text(
+            'Estado actual: ${state.doorState == DoorState.open ? "Abierta" : "Cerrada"}',
+            style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground),
           ),
-          const SizedBox(width: 8),
-          Container(
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: AppColors.muted,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: const Center(
-              child: Icon(Icons.stop_circle_outlined, size: 16, color: AppColors.mutedForeground),
-            ),
+          const SizedBox(height: 20),
+          _HitlSheetAction(
+            icon: Icons.lock_open_rounded,
+            label: 'Aprobar apertura de puerta',
+            color: AppColors.success,
+            onTap: state.doorState == DoorState.closed ? () {
+              provider.openDoor(user: 'HITL Operador', origin: 'HITL');
+              Navigator.pop(context);
+            } : null,
+          ),
+          const SizedBox(height: 10),
+          _HitlSheetAction(
+            icon: Icons.lock_rounded,
+            label: 'Aprobar cierre de puerta',
+            color: AppColors.info,
+            onTap: state.doorState == DoorState.open ? () {
+              provider.closeDoor(user: 'HITL Operador', origin: 'HITL');
+              Navigator.pop(context);
+            } : null,
+          ),
+          const SizedBox(height: 10),
+          _HitlSheetAction(
+            icon: Icons.do_not_disturb_rounded,
+            label: 'Ignorar acción pendiente',
+            color: AppColors.mutedForeground,
+            onTap: () => Navigator.pop(context),
           ),
         ],
       ),
@@ -355,77 +769,188 @@ class _PirModule extends StatelessWidget {
             ),
           ),
 
-          // Actions
-          if (state.animalDetected)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SmallAction(
-                          label: 'Ignorar',
-                          icon: Icons.do_not_disturb_rounded,
-                          onTap: () => provider.registerIncident('Evento PIR ignorado por operador'),
-                          color: AppColors.mutedForeground,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _SmallAction(
-                          label: 'Abrir puerta',
-                          icon: Icons.lock_open_rounded,
-                          onTap: () => provider.openDoor(user: 'Operador (PIR)', origin: 'Manual'),
-                          color: AppColors.success,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SmallAction(
-                          label: 'Activar alarma',
-                          icon: Icons.notifications_active_rounded,
-                          onTap: provider.triggerAlarm,
-                          color: AppColors.warning,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _SmallAction(
-                          label: 'Reg. incidente',
-                          icon: Icons.report_outlined,
-                          onTap: () => provider.registerIncident('Incidente registrado por operador — Zona norte'),
-                          color: AppColors.destructive,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.muted,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.mutedForeground),
-                    const SizedBox(width: 8),
-                    Text('Sin movimiento · Zona segura',
-                        style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground)),
-                  ],
-                ),
-              ),
+          // Actions depending on mode
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: _buildPirActions(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPirActions(BuildContext context) {
+    switch (state.operationMode) {
+      case OperationMode.manual:
+        if (!state.animalDetected) {
+          return Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.muted,
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: Row(
+              children: const [
+                Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.mutedForeground),
+                SizedBox(width: 8),
+                Text('Sin movimiento · Zona segura',
+                    style: TextStyle(fontSize: 11, color: AppColors.mutedForeground)),
+              ],
+            ),
+          );
+        }
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _SmallAction(
+                    label: 'Ignorar',
+                    icon: Icons.do_not_disturb_rounded,
+                    onTap: () => provider.registerIncident('Evento PIR ignorado por operador'),
+                    color: AppColors.mutedForeground,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _SmallAction(
+                    label: 'Abrir puerta',
+                    icon: Icons.lock_open_rounded,
+                    onTap: () => provider.openDoor(user: 'Operador (PIR)', origin: 'Manual'),
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _SmallAction(
+                    label: 'Activar alarma',
+                    icon: Icons.notifications_active_rounded,
+                    onTap: provider.triggerAlarm,
+                    color: AppColors.warning,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _SmallAction(
+                    label: 'Reg. incidente',
+                    icon: Icons.report_outlined,
+                    onTap: () => provider.registerIncident('Incidente registrado por operador — Zona norte'),
+                    color: AppColors.destructive,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+
+      case OperationMode.automatic:
+        return _AutoInfoRow(
+          icon: Icons.sensors_rounded,
+          text: 'El sistema envía notificaciones automáticamente al detectar movimiento.',
+        );
+
+      case OperationMode.humanInTheLoop:
+        return _HitlActionRow(
+          label: 'Revisar y decidir',
+          icon: Icons.supervised_user_circle_outlined,
+          onTap: () => _showPirHitlSheet(context),
+        );
+    }
+  }
+
+  void _showPirHitlSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _PirHitlSheet(state: state, provider: provider),
+    );
+  }
+}
+
+class _PirHitlSheet extends StatelessWidget {
+  final FarmState state;
+  final FarmProvider provider;
+  const _PirHitlSheet({required this.state, required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sensors_rounded, color: AppColors.warning),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Sensor PIR — Decisión HITL',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            state.animalDetected
+                ? '⚠️ Movimiento actualmente detectado en Zona Norte'
+                : '✅ Sin movimiento detectado — Zona segura',
+            style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+          ),
+          const SizedBox(height: 20),
+          if (state.animalDetected) ...[
+            _HitlSheetAction(
+              icon: Icons.lock_open_rounded,
+              label: 'Aprobar apertura de puerta',
+              color: AppColors.success,
+              onTap: () {
+                provider.openDoor(user: 'HITL Operador', origin: 'HITL');
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 10),
+            _HitlSheetAction(
+              icon: Icons.notifications_active_rounded,
+              label: 'Activar alarma',
+              color: AppColors.warning,
+              onTap: () {
+                provider.triggerAlarm();
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 10),
+            _HitlSheetAction(
+              icon: Icons.report_outlined,
+              label: 'Registrar incidente',
+              color: AppColors.destructive,
+              onTap: () {
+                provider.registerIncident('Incidente HITL — Zona norte');
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+          _HitlSheetAction(
+            icon: Icons.do_not_disturb_rounded,
+            label: 'Ignorar evento',
+            color: AppColors.mutedForeground,
+            onTap: () {
+              if (state.animalDetected) {
+                provider.registerIncident('Evento PIR ignorado por HITL operador');
+              }
+              Navigator.pop(context);
+            },
+          ),
         ],
       ),
     );
@@ -499,6 +1024,49 @@ class _WaterModule extends StatelessWidget {
     final liters = state.waterLiters;
     final autonomy = state.waterAutonomyHours;
 
+    Widget actions;
+    switch (state.operationMode) {
+      case OperationMode.manual:
+        actions = Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: (state.waterState != WaterState.filling && state.waterPercent < 100)
+                    ? () => provider.fillWater(user: 'Operador', origin: 'Manual')
+                    : null,
+                icon: const Icon(Icons.water_drop_rounded, size: 14),
+                label: const Text('Llenar'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: state.waterState != WaterState.empty ? provider.emptyWater : null,
+                icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
+                label: const Text('Vaciar'),
+              ),
+            ),
+          ],
+        );
+        break;
+      case OperationMode.automatic:
+        actions = Consumer<FarmProvider>(
+          builder: (_, prov, __) => _AutoThresholdInfo(
+            critical: prov.waterCriticalThreshold,
+            low: prov.waterLowThreshold,
+            normal: prov.waterNormalThreshold,
+          ),
+        );
+        break;
+      case OperationMode.humanInTheLoop:
+        actions = _HitlActionRow(
+          label: 'Revisar y decidir (Human in the Loop)',
+          icon: Icons.supervised_user_circle_outlined,
+          onTap: () => _showWaterHitlSheet(context),
+        );
+        break;
+    }
+
     return _ControlCard(
       icon: Icons.water_drop_outlined,
       title: 'Bebedero inteligente',
@@ -530,26 +1098,264 @@ class _WaterModule extends StatelessWidget {
           valueColor: state.valveOpen ? AppColors.success : AppColors.foreground,
         ),
       ],
-      actions: Row(
+      actions: actions,
+    );
+  }
+
+  void _showWaterHitlSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _WaterHitlSheet(state: state, provider: provider),
+    );
+  }
+}
+
+class _WaterHitlSheet extends StatelessWidget {
+  final FarmState state;
+  final FarmProvider provider;
+  const _WaterHitlSheet({required this.state, required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: (state.waterState != WaterState.filling && state.waterPercent < 100)
-                  ? () => provider.fillWater(user: 'Operador', origin: 'Manual')
-                  : null,
-              icon: const Icon(Icons.water_drop_rounded, size: 14),
-              label: const Text('Llenar'),
-            ),
+          Row(
+            children: [
+              const Icon(Icons.water_drop_outlined, color: AppColors.warning),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Bebedero — Decisión HITL',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: state.waterState != WaterState.empty ? provider.emptyWater : null,
-              icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
-              label: const Text('Vaciar'),
-            ),
+          const SizedBox(height: 4),
+          Text(
+            'Nivel actual: ${state.waterPercent.toStringAsFixed(0)}% · ${state.waterLiters.toStringAsFixed(1)} L disponibles',
+            style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+          ),
+          const SizedBox(height: 20),
+          _HitlSheetAction(
+            icon: Icons.water_drop_rounded,
+            label: 'Aprobar llenado del bebedero',
+            color: AppColors.info,
+            onTap: (state.waterState != WaterState.filling && state.waterPercent < 100) ? () {
+              provider.fillWater(user: 'HITL Operador', origin: 'HITL');
+              Navigator.pop(context);
+            } : null,
+          ),
+          const SizedBox(height: 10),
+          _HitlSheetAction(
+            icon: Icons.remove_circle_outline_rounded,
+            label: 'Aprobar vaciado del bebedero',
+            color: AppColors.destructive,
+            onTap: state.waterState != WaterState.empty ? () {
+              provider.emptyWater();
+              Navigator.pop(context);
+            } : null,
+          ),
+          const SizedBox(height: 10),
+          _HitlSheetAction(
+            icon: Icons.do_not_disturb_rounded,
+            label: 'Posponer decisión',
+            color: AppColors.mutedForeground,
+            onTap: () => Navigator.pop(context),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Auto threshold info (Automático mode) ────────────────────────────────────
+
+class _AutoThresholdInfo extends StatelessWidget {
+  final double critical;
+  final double low;
+  final double normal;
+  const _AutoThresholdInfo({required this.critical, required this.low, required this.normal});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.successLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.success.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.auto_fix_high_outlined, size: 14, color: AppColors.success),
+              SizedBox(width: 6),
+              Text('Configuración automática activa',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.success)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _AutoThresholdRow(icon: Icons.warning_amber_rounded, iconColor: AppColors.destructive,
+              label: 'Umbral crítico', value: '${critical.toStringAsFixed(0)}%'),
+          const SizedBox(height: 4),
+          _AutoThresholdRow(icon: Icons.water_drop_outlined, iconColor: AppColors.warning,
+              label: 'Umbral bajo', value: '${low.toStringAsFixed(0)}%'),
+          const SizedBox(height: 4),
+          _AutoThresholdRow(icon: Icons.water_drop_rounded, iconColor: AppColors.success,
+              label: 'Objetivo llenado', value: '${normal.toStringAsFixed(0)}%'),
+          const SizedBox(height: 6),
+          const Text('El sistema llenará automáticamente el bebedero cuando el nivel caiga al umbral bajo.',
+              style: TextStyle(fontSize: 10, color: AppColors.mutedForeground)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AutoThresholdRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  const _AutoThresholdRow({required this.icon, required this.iconColor, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 12, color: iconColor),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(label,
+              style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.foreground)),
+      ],
+    );
+  }
+}
+
+// ── Shared HITL action row ───────────────────────────────────────────────────
+
+class _HitlActionRow extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _HitlActionRow({required this.label, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+        decoration: BoxDecoration(
+          color: AppColors.warningBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.warning.withOpacity(0.45)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: AppColors.warning),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.warning),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.warning),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared Auto info row ──────────────────────────────────────────────────────
+
+class _AutoInfoRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _AutoInfoRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.successLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.success.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: AppColors.success),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text,
+                style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── HITL Bottom Sheet Action ──────────────────────────────────────────────────
+
+class _HitlSheetAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+  const _HitlSheetAction({required this.icon, required this.label, required this.color, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: enabled ? color.withOpacity(0.08) : AppColors.muted,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: enabled ? color.withOpacity(0.3) : AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: enabled ? color : AppColors.mutedForeground),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: enabled ? color : AppColors.mutedForeground,
+                  )),
+            ),
+            if (!enabled)
+              const Text('No disponible',
+                  style: TextStyle(fontSize: 10, color: AppColors.mutedForeground)),
+          ],
+        ),
       ),
     );
   }

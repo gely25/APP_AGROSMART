@@ -377,26 +377,27 @@ class _NotifBanner extends StatelessWidget {
       onTap: onTap,
       child: Material(
         elevation: 12,
-        shadowColor: Colors.black.withOpacity(0.25),
+        shadowColor: Colors.black.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: AppColors.card,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _color.withOpacity(0.25), width: 1.5),
+            border: Border.all(color: _color.withValues(alpha: 0.3), width: 1.5),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // App icon area
+              // Colored icon
               Container(
-                width: 40, height: 40,
+                width: 42, height: 42,
                 decoration: BoxDecoration(
-                  color: _color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _color.withOpacity(0.3)),
+                  color: _color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: _color.withValues(alpha: 0.25)),
                 ),
-                child: Icon(_icon, size: 18, color: _color),
+                child: Icon(_icon, size: 20, color: _color),
               ),
               const SizedBox(width: 12),
 
@@ -404,17 +405,20 @@ class _NotifBanner extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Row(
                       children: [
-                        // SmartFarm label
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppColors.primaryLight,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text('SmartFarm', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                          child: const Text(
+                            'SmartFarm',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          ),
                         ),
                         const Spacer(),
                         Text(
@@ -424,18 +428,24 @@ class _NotifBanner extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 3),
-                    Text(notif.title,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.foreground),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text(notif.message,
-                        style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
-                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text(
+                      notif.title,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.foreground),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      notif.message,
+                      style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground, height: 1.3),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
 
-              // Dismiss
+              // Dismiss button
               GestureDetector(
                 onTap: onDismiss,
                 child: Container(
