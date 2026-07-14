@@ -16,6 +16,7 @@ class _AuditScreenState extends State<AuditScreen> {
   String _filter = 'today';
   String _searchQuery = '';
   AuditEventType? _typeFilter;
+  bool? _successFilter;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -35,15 +36,59 @@ class _AuditScreenState extends State<AuditScreen> {
       }
       // Type filter
       if (_typeFilter != null && e.type != _typeFilter) return false;
+      // Success filter
+      if (_successFilter != null && e.success != _successFilter) return false;
       // Search
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!e.action.toLowerCase().contains(q) &&
             !e.detail.toLowerCase().contains(q) &&
-            !e.user.toLowerCase().contains(q)) return false;
+            !e.user.toLowerCase().contains(q) &&
+            !(e.corral?.toLowerCase().contains(q) ?? false) &&
+            !(e.device?.toLowerCase().contains(q) ?? false)) return false;
       }
       return true;
     }).toList();
+  }
+
+  void _simulateExport(BuildContext context, List<AuditEvent> events) async {
+    // Show progress dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: AppColors.card,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: AppColors.primary),
+            const SizedBox(height: 16),
+            Text('Exportando ${events.length} registros...', style: const TextStyle(fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Expanded(child: Text('${events.length} registros exportados a auditoria_${DateFormat("yyyyMMdd_HHmm").format(DateTime.now())}.csv')),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
   }
 
   @override
@@ -58,12 +103,18 @@ class _AuditScreenState extends State<AuditScreen> {
             _AuditToolbar(
               filter: _filter,
               typeFilter: _typeFilter,
+              successFilter: _successFilter,
               searchCtrl: _searchCtrl,
               onFilterChange: (v) => setState(() => _filter = v),
               onTypeChange: (v) => setState(() => _typeFilter = v),
+              onSuccessChange: (v) => setState(() => _successFilter = v),
               onSearchChange: (v) => setState(() => _searchQuery = v),
               eventCount: filtered.length,
+              onExport: () => _simulateExport(context, filtered),
             ),
+
+            // Summary strip
+            if (filtered.isNotEmpty) _AuditSummaryStrip(events: filtered),
 
             // Timeline
             Expanded(
@@ -85,25 +136,96 @@ class _AuditScreenState extends State<AuditScreen> {
   }
 }
 
+// ── Summary Strip ─────────────────────────────────────────────────────────────
+
+class _AuditSummaryStrip extends StatelessWidget {
+  final List<AuditEvent> events;
+  const _AuditSummaryStrip({required this.events});
+
+  @override
+  Widget build(BuildContext context) {
+    final success = events.where((e) => e.success).length;
+    final failed = events.length - success;
+    final byDoor = events.where((e) => e.type == AuditEventType.door).length;
+    final byWater = events.where((e) => e.type == AuditEventType.water).length;
+    final byPir = events.where((e) => e.type == AuditEventType.pir).length;
+
+    return Container(
+      color: AppColors.background,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _SummaryTile(label: 'Total', count: events.length, color: AppColors.info),
+            const SizedBox(width: 8),
+            _SummaryTile(label: 'Exitosos', count: success, color: AppColors.success),
+            const SizedBox(width: 8),
+            _SummaryTile(label: 'Fallidos', count: failed, color: AppColors.destructive),
+            const SizedBox(width: 8),
+            _SummaryTile(label: 'Puerta', count: byDoor, color: AppColors.info),
+            const SizedBox(width: 8),
+            _SummaryTile(label: 'Agua', count: byWater, color: const Color(0xFF3B6FD4)),
+            const SizedBox(width: 8),
+            _SummaryTile(label: 'PIR', count: byPir, color: AppColors.warning),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryTile extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+  const _SummaryTile({required this.label, required this.count, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.09),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$count', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+          Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: color.withOpacity(0.8))),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
 class _AuditToolbar extends StatelessWidget {
   final String filter;
   final AuditEventType? typeFilter;
+  final bool? successFilter;
   final TextEditingController searchCtrl;
   final void Function(String) onFilterChange;
   final void Function(AuditEventType?) onTypeChange;
+  final void Function(bool?) onSuccessChange;
   final void Function(String) onSearchChange;
   final int eventCount;
+  final VoidCallback onExport;
 
   const _AuditToolbar({
     required this.filter,
     required this.typeFilter,
+    required this.successFilter,
     required this.searchCtrl,
     required this.onFilterChange,
     required this.onTypeChange,
+    required this.onSuccessChange,
     required this.onSearchChange,
     required this.eventCount,
+    required this.onExport,
   });
 
   @override
@@ -126,7 +248,7 @@ class _AuditToolbar extends StatelessWidget {
               onChanged: onSearchChange,
               style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
-                hintText: 'Buscar eventos, acciones o usuarios...',
+                hintText: 'Buscar eventos, dispositivos o usuarios...',
                 hintStyle: const TextStyle(color: AppColors.mutedForeground, fontSize: 12),
                 prefixIcon: const Icon(Icons.search_rounded, size: 16, color: AppColors.mutedForeground),
                 suffixText: '$eventCount eventos',
@@ -156,12 +278,15 @@ class _AuditToolbar extends StatelessWidget {
                 _TypeChip(label: 'PIR', value: AuditEventType.pir, current: typeFilter, onTap: onTypeChange),
                 const SizedBox(width: 6),
                 _TypeChip(label: 'Sistema', value: AuditEventType.system, current: typeFilter, onTap: onTypeChange),
+                const SizedBox(width: 10),
+                // Success/Failed filter
+                _SuccessChip(label: 'Exitoso', value: true, current: successFilter, onTap: onSuccessChange),
                 const SizedBox(width: 6),
+                _SuccessChip(label: 'Fallido', value: false, current: successFilter, onTap: onSuccessChange),
+                const SizedBox(width: 10),
                 // Export button
                 GestureDetector(
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Exportación en desarrollo'), behavior: SnackBarBehavior.floating),
-                  ),
+                  onTap: onExport,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
@@ -173,7 +298,7 @@ class _AuditToolbar extends StatelessWidget {
                       children: const [
                         Icon(Icons.download_rounded, size: 12, color: AppColors.primary),
                         SizedBox(width: 4),
-                        Text('Exportar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                        Text('Exportar CSV', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
                       ],
                     ),
                   ),
@@ -245,6 +370,36 @@ class _TypeChip extends StatelessWidget {
   }
 }
 
+class _SuccessChip extends StatelessWidget {
+  final String label;
+  final bool value;
+  final bool? current;
+  final void Function(bool?) onTap;
+  const _SuccessChip({required this.label, required this.value, required this.current, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final active = current == value;
+    final color = value ? AppColors.success : AppColors.destructive;
+    return GestureDetector(
+      onTap: () => onTap(active ? null : value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? color.withOpacity(0.12) : AppColors.muted,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: active ? color.withOpacity(0.4) : AppColors.border),
+        ),
+        child: Text(label, style: TextStyle(
+          fontSize: 11, fontWeight: FontWeight.w500,
+          color: active ? color : AppColors.mutedForeground,
+        )),
+      ),
+    );
+  }
+}
+
 // ── Timeline Item ─────────────────────────────────────────────────────────────
 
 class _AuditTimelineItem extends StatelessWidget {
@@ -277,8 +432,6 @@ class _AuditTimelineItem extends StatelessWidget {
       case AuditEventType.system: return Icons.settings_rounded;
     }
   }
-
-  String get _originLabel => event.origin;
 
   Color get _originColor {
     switch (event.origin) {
@@ -337,7 +490,10 @@ class _AuditTimelineItem extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.card,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(
+                    color: event.success ? AppColors.border : AppColors.destructive.withOpacity(0.3),
+                    width: event.success ? 1 : 1.5,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,6 +505,14 @@ class _AuditTimelineItem extends StatelessWidget {
                           child: Text(event.action,
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.foreground)),
                         ),
+                        Container(
+                          width: 8, height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: event.success ? AppColors.success : AppColors.destructive,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
                         Text(timeStr,
                             style: const TextStyle(fontSize: 10, color: AppColors.mutedForeground, fontFamily: 'monospace')),
                       ],
@@ -360,31 +524,56 @@ class _AuditTimelineItem extends StatelessWidget {
                         style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground)),
                     const SizedBox(height: 8),
 
-                    // Footer chips
-                    Row(
-                      children: [
-                        _AuditChip(label: dateStr, icon: Icons.calendar_today_outlined, color: AppColors.mutedForeground),
-                        const SizedBox(width: 6),
-                        _AuditChip(label: event.user, icon: Icons.person_outline_rounded, color: AppColors.mutedForeground),
-                        const SizedBox(width: 6),
-                        _AuditChip(label: _originLabel, icon: Icons.source_rounded, color: _originColor),
-                        if (event.duration != null) ...[
-                          const SizedBox(width: 6),
-                          _AuditChip(
-                            label: _formatDuration(event.duration!),
-                            icon: Icons.timer_outlined,
-                            color: AppColors.mutedForeground,
-                          ),
-                        ],
-                        const Spacer(),
-                        Container(
-                          width: 8, height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: event.success ? AppColors.success : AppColors.destructive,
-                          ),
+                    // Extended info grid
+                    if (event.corral != null || event.device != null || event.result != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ],
+                        child: Row(
+                          children: [
+                            if (event.corral != null) ...[
+                              _MiniField(icon: Icons.fence_rounded, label: event.corral!),
+                              const SizedBox(width: 8),
+                            ],
+                            if (event.device != null) ...[
+                              _MiniField(icon: Icons.device_hub_rounded, label: event.device!),
+                              const SizedBox(width: 8),
+                            ],
+                            if (event.result != null)
+                              _MiniField(
+                                icon: event.success ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
+                                label: event.result!,
+                                color: event.success ? AppColors.success : AppColors.destructive,
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Footer chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _AuditChip(label: dateStr, icon: Icons.calendar_today_outlined, color: AppColors.mutedForeground),
+                          const SizedBox(width: 6),
+                          _AuditChip(label: event.user, icon: Icons.person_outline_rounded, color: AppColors.mutedForeground),
+                          const SizedBox(width: 6),
+                          _AuditChip(label: event.origin, icon: Icons.source_rounded, color: _originColor),
+                          if (event.duration != null) ...[
+                            const SizedBox(width: 6),
+                            _AuditChip(
+                              label: _formatDuration(event.duration!),
+                              icon: Icons.timer_outlined,
+                              color: AppColors.mutedForeground,
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -400,6 +589,25 @@ class _AuditTimelineItem extends StatelessWidget {
     if (d.inHours > 0) return '${d.inHours}h ${d.inMinutes.remainder(60)}m';
     if (d.inMinutes > 0) return '${d.inMinutes}m ${d.inSeconds.remainder(60)}s';
     return '${d.inSeconds}s';
+  }
+}
+
+class _MiniField extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _MiniField({required this.icon, required this.label, this.color = AppColors.mutedForeground});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 3),
+        Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500)),
+      ],
+    );
   }
 }
 

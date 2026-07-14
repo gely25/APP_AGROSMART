@@ -515,7 +515,7 @@ class _WaterModule extends StatelessWidget {
           : state.waterState == WaterState.filling
               ? _Tone.info
               : _Tone.success,
-      animation: WaterAnimation(waterState: state.waterState),
+      animation: WaterAnimation(waterState: state.waterState, waterPercent: state.waterPercent),
       metrics: [
         _MetricRow(icon: Icons.percent_rounded, label: 'Nivel', value: '${state.waterPercent.toStringAsFixed(0)}%'),
         _MetricRow(icon: Icons.water_rounded, label: 'Litros disponibles', value: '${liters.toStringAsFixed(1)} L'),

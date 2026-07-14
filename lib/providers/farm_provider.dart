@@ -18,6 +18,9 @@ AuditEvent _makeAudit({
   String origin = 'Sistema',
   Duration? duration,
   bool success = true,
+  String? corral,
+  String? device,
+  String? result,
 }) => AuditEvent(
   id: _uid(),
   type: type,
@@ -28,6 +31,9 @@ AuditEvent _makeAudit({
   at: DateTime.now(),
   duration: duration,
   success: success,
+  corral: corral,
+  device: device,
+  result: result,
 );
 
 AppNotification _makeNotif({
@@ -169,6 +175,54 @@ class FarmProvider extends ChangeNotifier {
   List<AutomationRule> get rules => _rules;
   List<AutomationSchedule> get schedules => _schedules;
 
+  // Thresholds (Umbrales)
+  double waterCriticalThreshold = 15.0;
+  double waterLowThreshold = 25.0;
+  double waterNormalThreshold = 80.0;
+  double waterMaxThreshold = 100.0;
+
+  // Door Parameters (Valores Predeterminados / Default)
+  int doorOpenTimeSeconds = 30;
+  int doorMaxOpenMinutes = 5;
+  int doorWaitTimeSeconds = 10;
+  int doorMaxAttempts = 3;
+  int doorCheckFrequencySeconds = 10;
+
+  void updateThresholds({double? critical, double? low, double? normal, double? max}) {
+    if (critical != null) waterCriticalThreshold = critical;
+    if (low != null) waterLowThreshold = low;
+    if (normal != null) waterNormalThreshold = normal;
+    if (max != null) waterMaxThreshold = max;
+    notifyListeners();
+  }
+
+  void resetThresholds() {
+    waterCriticalThreshold = 15.0;
+    waterLowThreshold = 25.0;
+    waterNormalThreshold = 80.0;
+    waterMaxThreshold = 100.0;
+    notifyListeners();
+  }
+
+  void updateDoorParams({int? openTime, int? maxOpen, int? waitTime, int? maxAttempts, int? checkFreq}) {
+    if (openTime != null) doorOpenTimeSeconds = openTime;
+    if (maxOpen != null) doorMaxOpenMinutes = maxOpen;
+    if (waitTime != null) doorWaitTimeSeconds = waitTime;
+    if (maxAttempts != null) doorMaxAttempts = maxAttempts;
+    if (checkFreq != null) doorCheckFrequencySeconds = checkFreq;
+    notifyListeners();
+  }
+
+  void deleteRule(String id) {
+    _rules = _rules.where((r) => r.id != id).toList();
+    notifyListeners();
+  }
+
+  void updateRule(AutomationRule rule) {
+    _rules = _rules.map((r) => r.id == rule.id ? rule : r).toList();
+    notifyListeners();
+  }
+
   // Main farm state
   FarmState _state = FarmState(
     connected: true,
@@ -219,11 +273,14 @@ class FarmProvider extends ChangeNotifier {
         id: 'a1',
         type: AuditEventType.system,
         action: 'Sistema iniciado',
-        detail: 'ESP32 conectado exitosamente. IP: 192.168.1.120',
+        detail: 'Controlador conectado exitosamente. IP: 192.168.1.120',
         user: 'Sistema',
         origin: 'Sistema',
         at: DateTime.now().subtract(const Duration(hours: 3)),
         success: true,
+        corral: 'Corral Norte',
+        device: 'Controlador ESP32',
+        result: 'Exitoso',
       ),
       AuditEvent(
         id: 'a2',
@@ -235,6 +292,9 @@ class FarmProvider extends ChangeNotifier {
         at: DateTime.now().subtract(const Duration(minutes: 55)),
         duration: const Duration(minutes: 10),
         success: true,
+        corral: 'Corral Norte',
+        device: 'Puerta #1',
+        result: 'Exitoso',
       ),
       AuditEvent(
         id: 'a3',
@@ -245,6 +305,9 @@ class FarmProvider extends ChangeNotifier {
         origin: 'Automático',
         at: DateTime.now().subtract(const Duration(minutes: 45)),
         success: true,
+        corral: 'Corral Norte',
+        device: 'Puerta #1',
+        result: 'Exitoso',
       ),
       AuditEvent(
         id: 'a4',
@@ -255,6 +318,9 @@ class FarmProvider extends ChangeNotifier {
         origin: 'Sensor',
         at: DateTime.now().subtract(const Duration(minutes: 8)),
         success: true,
+        corral: 'Corral Norte',
+        device: 'Sensor PIR',
+        result: 'Detectado',
       ),
       AuditEvent(
         id: 'a5',
@@ -266,6 +332,9 @@ class FarmProvider extends ChangeNotifier {
         at: DateTime.now().subtract(const Duration(hours: 2)),
         duration: const Duration(seconds: 45),
         success: true,
+        corral: 'Corral Norte',
+        device: 'Bebedero #1',
+        result: 'Exitoso',
       ),
     ],
     events: [
@@ -422,6 +491,24 @@ class FarmProvider extends ChangeNotifier {
   void updateSensorDevice(String corralId, String sensorId, SensorDevice Function(SensorDevice) update) {
     _replaceCorral(corralId, (c) => c.copyWith(
       sensors: c.sensors.map((s) => s.id == sensorId ? update(s) : s).toList(),
+    ));
+  }
+
+  void deleteDoorDevice(String corralId, String doorId) {
+    _replaceCorral(corralId, (c) => c.copyWith(
+      doors: c.doors.where((d) => d.id != doorId).toList(),
+    ));
+  }
+
+  void deleteWatererDevice(String corralId, String watererId) {
+    _replaceCorral(corralId, (c) => c.copyWith(
+      waterers: c.waterers.where((w) => w.id != watererId).toList(),
+    ));
+  }
+
+  void deleteSensorDevice(String corralId, String sensorId) {
+    _replaceCorral(corralId, (c) => c.copyWith(
+      sensors: c.sensors.where((s) => s.id != sensorId).toList(),
     ));
   }
 

@@ -70,6 +70,10 @@ class AuditEvent {
   final DateTime at;
   final Duration? duration;
   final bool success;
+  // Extended audit fields
+  final String? corral;   // Name of the corral where the event happened
+  final String? device;  // Specific device (e.g. 'Puerta #1', 'Bebedero #1', 'Sensor PIR')
+  final String? result;  // Human-readable result (e.g. 'Exitoso', 'Fallo', 'Timeout')
 
   const AuditEvent({
     required this.id,
@@ -81,6 +85,9 @@ class AuditEvent {
     required this.at,
     this.duration,
     this.success = true,
+    this.corral,
+    this.device,
+    this.result,
   });
 }
 

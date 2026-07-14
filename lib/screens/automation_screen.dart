@@ -11,60 +11,53 @@ class AutomationScreen extends StatefulWidget {
   State<AutomationScreen> createState() => _AutomationScreenState();
 }
 
-class _AutomationScreenState extends State<AutomationScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabCtrl.dispose();
-    super.dispose();
-  }
-
+class _AutomationScreenState extends State<AutomationScreen> {
   @override
   Widget build(BuildContext context) {
     return Consumer<FarmProvider>(
       builder: (_, provider, __) {
-        return Column(
-          children: [
-            // Mode selector card
-            _ModeHeaderCard(
-              mode: provider.state.operationMode,
-              onChanged: provider.setMode,
-            ),
+        final mode = provider.state.operationMode;
+        final isHitl = mode == OperationMode.humanInTheLoop;
+        final tabsCount = isHitl ? 3 : 2;
 
-            // Tabs
-            Container(
-              color: AppColors.background,
-              child: TabBar(
-                controller: _tabCtrl,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.mutedForeground,
-                indicatorColor: AppColors.primary,
-                labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                tabs: const [
-                  Tab(text: 'Reglas SI / ENTONCES'),
-                  Tab(text: 'Horarios'),
-                ],
+        return DefaultTabController(
+          key: ValueKey(mode),
+          length: tabsCount,
+          child: Column(
+            children: [
+              // Mode selector card
+              _ModeHeaderCard(
+                mode: mode,
+                onChanged: provider.setMode,
               ),
-            ),
 
-            Expanded(
-              child: TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _RulesTab(provider: provider),
-                  _SchedulesTab(provider: provider),
-                ],
+              // Tabs
+              Container(
+                color: AppColors.background,
+                child: TabBar(
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.mutedForeground,
+                  indicatorColor: AppColors.primary,
+                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  tabs: [
+                    const Tab(text: 'Reglas SI / ENTONCES'),
+                    if (isHitl) const Tab(text: 'Umbrales y Parámetros'),
+                    const Tab(text: 'Horarios'),
+                  ],
+                ),
               ),
-            ),
-          ],
+
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _RulesTab(provider: provider, isHitl: isHitl),
+                    if (isHitl) _ThresholdsTab(provider: provider),
+                    _SchedulesTab(provider: provider),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -82,18 +75,18 @@ class _ModeHeaderCard extends StatelessWidget {
     switch (mode) {
       case OperationMode.manual: return 'Manual';
       case OperationMode.automatic: return 'Automático';
-      case OperationMode.humanInTheLoop: return 'Human in the Loop (HITL)';
+      case OperationMode.humanInTheLoop: return 'HITL';
     }
   }
 
   String get _modeDesc {
     switch (mode) {
       case OperationMode.manual:
-        return 'El operador controla todo manualmente. Las reglas no se ejecutan automáticamente.';
+        return 'Tú controlas cada acción del corral de forma directa.';
       case OperationMode.automatic:
-        return 'El sistema ejecuta las reglas automáticamente sin requerir aprobación.';
+        return 'El sistema aplica la configuración automática.';
       case OperationMode.humanInTheLoop:
-        return 'El sistema solicita aprobación del operador antes de ejecutar acciones críticas.';
+        return 'El sistema solicita tu aprobación antes de ejecutar acciones críticas.';
     }
   }
 
@@ -127,18 +120,18 @@ class _ModeHeaderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(_modeDesc, style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground)),
           const SizedBox(height: 12),
           Row(
             children: [
               _ModeBtn(label: 'Manual', icon: Icons.pan_tool_outlined, mode: OperationMode.manual, current: mode, onTap: onChanged),
               const SizedBox(width: 6),
-              _ModeBtn(label: 'Auto', icon: Icons.auto_fix_high_outlined, mode: OperationMode.automatic, current: mode, onTap: onChanged),
+              _ModeBtn(label: 'Automático', icon: Icons.auto_fix_high_outlined, mode: OperationMode.automatic, current: mode, onTap: onChanged),
               const SizedBox(width: 6),
               _ModeBtn(label: 'HITL', icon: Icons.supervised_user_circle_outlined, mode: OperationMode.humanInTheLoop, current: mode, onTap: onChanged),
             ],
           ),
+          const SizedBox(height: 12),
+          Text(_modeDesc, style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground)),
         ],
       ),
     );
@@ -185,70 +178,59 @@ class _ModeBtn extends StatelessWidget {
 
 class _RulesTab extends StatelessWidget {
   final FarmProvider provider;
-  const _RulesTab({required this.provider});
+  final bool isHitl;
+  const _RulesTab({required this.provider, required this.isHitl});
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        // Info note
         _InfoNote(
           icon: Icons.info_outline_rounded,
-          text: 'Las reglas SI/ENTONCES se evalúan en tiempo real. '
-              'En modo HITL, las acciones críticas requieren aprobación del operador.',
-          color: AppColors.info,
+          text: 'Las reglas se evalúan continuamente. En modo HITL las acciones críticas requieren tu aprobación.',
+          color: AppColors.primary,
         ),
         const SizedBox(height: 14),
 
-        // Section label
-        const _SectionLabel('REGLAS ACTIVAS'),
+        const _SectionLabel('REGLAS CONFIGURADAS'),
         const SizedBox(height: 10),
 
-        // Rules list
         ...provider.rules.map((rule) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: _RuleCard(rule: rule, provider: provider),
+          child: _RuleCard(rule: rule, provider: provider, isHitl: isHitl),
         )),
 
         const SizedBox(height: 14),
 
-        // Add rule hint
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.muted,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.add_circle_outline_rounded, size: 16, color: AppColors.mutedForeground),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('Crear nueva regla', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.foreground)),
-                    SizedBox(height: 2),
-                    Text('Constructor de reglas personalizadas — próxima versión',
-                        style: TextStyle(fontSize: 10, color: AppColors.mutedForeground)),
-                  ],
-                ),
+        if (isHitl)
+          GestureDetector(
+            onTap: () => _showRuleDialog(context),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                ),
-                child: const Text('Próximo', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.add_circle_outline_rounded, size: 16, color: AppColors.primary),
+                  SizedBox(width: 8),
+                  Text('Crear nueva regla', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
       ],
+    );
+  }
+
+  void _showRuleDialog(BuildContext context, {AutomationRule? editRule}) {
+    showDialog(
+      context: context,
+      builder: (_) => _AddEditRuleDialog(provider: provider, editRule: editRule),
     );
   }
 }
@@ -256,7 +238,8 @@ class _RulesTab extends StatelessWidget {
 class _RuleCard extends StatelessWidget {
   final AutomationRule rule;
   final FarmProvider provider;
-  const _RuleCard({required this.rule, required this.provider});
+  final bool isHitl;
+  const _RuleCard({required this.rule, required this.provider, required this.isHitl});
 
   @override
   Widget build(BuildContext context) {
@@ -271,53 +254,81 @@ class _RuleCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Header
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: rule.enabled ? AppColors.primaryLight : AppColors.muted,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.auto_fix_high_rounded,
-                      size: 16, color: rule.enabled ? AppColors.primary : AppColors.mutedForeground),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Condition → Action
+                      // SI Row
                       Row(
                         children: [
-                          Flexible(
-                            child: _ConditionPill(label: 'SI: ${rule.conditionLabel}', color: AppColors.warning),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'SI',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward_rounded, size: 10, color: AppColors.mutedForeground),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: _ConditionPill(label: 'ENTONCES: ${rule.actionLabel}', color: AppColors.success),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              rule.conditionLabel.toLowerCase(),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedForeground,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      if (rule.requiresHITL) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: const [
-                            Icon(Icons.supervised_user_circle_outlined, size: 10, color: AppColors.warning),
-                            SizedBox(width: 4),
-                            Text('Requiere aprobación HITL', style: TextStyle(fontSize: 10, color: AppColors.warning)),
-                          ],
-                        ),
-                      ],
+                      const SizedBox(height: 8),
+                      // ENTONCES Row
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '➔ ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const Text(
+                            'ENTONCES ',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.foreground,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              rule.actionLabel,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedForeground,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                // Toggle
+                const SizedBox(width: 12),
                 Switch.adaptive(
                   value: rule.enabled,
                   activeColor: AppColors.primary,
@@ -327,35 +338,374 @@ class _RuleCard extends StatelessWidget {
             ),
           ),
 
-          // Footer
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: AppColors.muted.withOpacity(0.5),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 7, height: 7,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: rule.enabled ? AppColors.success : AppColors.mutedForeground,
+          // Footer Actions (Only shown in HITL mode)
+          if (isHitl)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.muted.withOpacity(0.5),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+              ),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => _AddEditRuleDialog(provider: provider, editRule: rule),
+                      );
+                    },
+                    child: Row(
+                      children: const [
+                        Icon(Icons.edit_outlined, size: 12, color: AppColors.info),
+                        SizedBox(width: 4),
+                        Text('Editar', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.info)),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Text(rule.enabled ? 'Regla activa' : 'Regla desactivada',
-                    style: TextStyle(fontSize: 10, color: rule.enabled ? AppColors.success : AppColors.mutedForeground)),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => provider.toggleRuleHITL(rule.id),
-                  child: Text(
-                    rule.requiresHITL ? 'Quitar HITL' : 'Activar HITL',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.info),
+                  const SizedBox(width: 14),
+                  GestureDetector(
+                    onTap: () {
+                      final duplicate = AutomationRule(
+                        id: 'rule_${DateTime.now().millisecondsSinceEpoch}',
+                        condition: rule.condition,
+                        conditionLabel: '${rule.conditionLabel} (Copia)',
+                        action: rule.action,
+                        actionLabel: rule.actionLabel,
+                        enabled: rule.enabled,
+                        requiresHITL: rule.requiresHITL,
+                      );
+                      provider.addRule(duplicate);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Regla duplicada con éxito'), behavior: SnackBarBehavior.floating),
+                      );
+                    },
+                    child: Row(
+                      children: const [
+                        Icon(Icons.copy_rounded, size: 12, color: AppColors.mutedForeground),
+                        SizedBox(width: 4),
+                        Text('Duplicar', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.mutedForeground)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      provider.deleteRule(rule.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Regla eliminada'), behavior: SnackBarBehavior.floating),
+                      );
+                    },
+                    child: Row(
+                      children: const [
+                        Icon(Icons.delete_outline_rounded, size: 12, color: AppColors.destructive),
+                        SizedBox(width: 4),
+                        Text('Eliminar', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.destructive)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Add/Edit Rule Dialog ──────────────────────────────────────────────────────
+
+class _AddEditRuleDialog extends StatefulWidget {
+  final FarmProvider provider;
+  final AutomationRule? editRule;
+  const _AddEditRuleDialog({required this.provider, this.editRule});
+
+  @override
+  State<_AddEditRuleDialog> createState() => _AddEditRuleDialogState();
+}
+
+class _AddEditRuleDialogState extends State<_AddEditRuleDialog> {
+  late String _condition;
+  late String _action;
+  late bool _requiresHITL;
+  late double _selectedWaterThreshold;
+
+  static const _conditions = [
+    ('water_below', 'Nivel de agua umbral'),
+    ('motion_detected', 'Movimiento detectado'),
+    ('door_open', 'Puerta abierta'),
+  ];
+
+  static const _actions = [
+    ('fill_water', 'Solicitar llenado del bebedero'),
+    ('send_notification', 'Notificar al operador'),
+    ('request_door', 'Solicitar apertura de puerta'),
+    ('trigger_alarm', 'Activar alarma física'),
+  ];
+
+  final _waterThresholds = [15.0, 25.0, 40.0, 80.0];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.editRule != null) {
+      final r = widget.editRule!;
+      _requiresHITL = r.requiresHITL;
+      _action = r.action;
+      if (r.condition.startsWith('water_below')) {
+        _condition = 'water_below';
+        final val = double.tryParse(r.condition.split('_').last) ?? 20.0;
+        _selectedWaterThreshold = _waterThresholds.contains(val) ? val : 25.0;
+      } else {
+        _condition = r.condition;
+        _selectedWaterThreshold = 25.0;
+      }
+    } else {
+      _condition = 'water_below';
+      _action = 'fill_water';
+      _requiresHITL = false;
+      _selectedWaterThreshold = 25.0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isWater = _condition == 'water_below';
+    final title = widget.editRule == null ? 'Crear Regla' : 'Editar Regla';
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: AppColors.card,
+      title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('SI ocurre la condición:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.mutedForeground)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _condition,
+                  items: _conditions.map((c) => DropdownMenuItem(value: c.$1, child: Text(c.$2, style: const TextStyle(fontSize: 13)))).toList(),
+                  onChanged: (v) => setState(() => _condition = v!),
+                  isExpanded: true,
+                ),
+              ),
+            ),
+
+            if (isWater) ...[
+              const SizedBox(height: 12),
+              const Text('Nivel de agua umbral:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.mutedForeground)),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: _waterThresholds.map((val) {
+                  final selected = _selectedWaterThreshold == val;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedWaterThreshold = val),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primary : AppColors.muted,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+                      ),
+                      child: Text('${val.toInt()}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: selected ? Colors.white : AppColors.foreground)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+            const Text('ENTONCES ejecutar acción:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.mutedForeground)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _action,
+                  items: _actions.map((a) => DropdownMenuItem(value: a.$1, child: Text(a.$2, style: const TextStyle(fontSize: 13)))).toList(),
+                  onChanged: (v) => setState(() => _action = v!),
+                  isExpanded: true,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('Requiere aprobación del operador (HITL)', style: TextStyle(fontSize: 12)),
+              value: _requiresHITL,
+              activeColor: AppColors.primary,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              onChanged: (v) => setState(() => _requiresHITL = v!),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        ElevatedButton(
+          onPressed: () {
+            final condLabel = _condition == 'water_below' ? 'nivel de agua < ${_selectedWaterThreshold.toInt()}%' : _conditions.firstWhere((c) => c.$1 == _condition).$2;
+            final condVal = _condition == 'water_below' ? 'water_below_${_selectedWaterThreshold.toInt()}' : _condition;
+            final actLabel = _actions.firstWhere((a) => a.$1 == _action).$2;
+
+            if (widget.editRule != null) {
+              final updated = AutomationRule(
+                id: widget.editRule!.id,
+                condition: condVal,
+                conditionLabel: condLabel,
+                action: _action,
+                actionLabel: actLabel,
+                enabled: widget.editRule!.enabled,
+                requiresHITL: _requiresHITL,
+              );
+              widget.provider.updateRule(updated);
+            } else {
+              final newRule = AutomationRule(
+                id: 'rule_${DateTime.now().millisecondsSinceEpoch}',
+                condition: condVal,
+                conditionLabel: condLabel,
+                action: _action,
+                actionLabel: actLabel,
+                enabled: true,
+                requiresHITL: _requiresHITL,
+              );
+              widget.provider.addRule(newRule);
+            }
+            Navigator.pop(context);
+          },
+          child: const Text('Guardar'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Thresholds Tab ────────────────────────────────────────────────────────────
+
+class _ThresholdsTab extends StatelessWidget {
+  final FarmProvider provider;
+  const _ThresholdsTab({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const _SectionLabel('CONFIGURACIÓN DE UMBRALES DE AGUA'),
+        const SizedBox(height: 10),
+        _ThresholdSliderCard(
+          label: 'Nivel Crítico',
+          value: provider.waterCriticalThreshold,
+          recommended: 15.0,
+          onChanged: (v) => provider.updateThresholds(critical: v),
+        ),
+        const SizedBox(height: 10),
+        _ThresholdSliderCard(
+          label: 'Nivel Bajo',
+          value: provider.waterLowThreshold,
+          recommended: 25.0,
+          onChanged: (v) => provider.updateThresholds(low: v),
+        ),
+        const SizedBox(height: 10),
+        _ThresholdSliderCard(
+          label: 'Nivel Normal',
+          value: provider.waterNormalThreshold,
+          recommended: 80.0,
+          onChanged: (v) => provider.updateThresholds(normal: v),
+        ),
+        const SizedBox(height: 10),
+        _ThresholdSliderCard(
+          label: 'Nivel Máximo',
+          value: provider.waterMaxThreshold,
+          recommended: 100.0,
+          onChanged: (v) => provider.updateThresholds(max: v),
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: OutlinedButton.icon(
+            onPressed: provider.resetThresholds,
+            icon: const Icon(Icons.settings_backup_restore_rounded, size: 16),
+            label: const Text('Restablecer valores recomendados'),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        const _SectionLabel('PARÁMETROS DE PUERTA AUTOMÁTICA'),
+        const SizedBox(height: 10),
+        _ParamsGroup(provider: provider),
+      ],
+    );
+  }
+}
+
+class _ThresholdSliderCard extends StatelessWidget {
+  final String label;
+  final double value;
+  final double recommended;
+  final void Function(double) onChanged;
+
+  const _ThresholdSliderCard({required this.label, required this.value, required this.recommended, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('Recomendado: ${recommended.toInt()}%', style: const TextStyle(fontSize: 10, color: AppColors.mutedForeground)),
+                ],
+              ),
+              Container(
+                width: 60,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border),
+                ),
+                alignment: Alignment.center,
+                child: Text('${value.toInt()}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Slider(
+            value: value,
+            min: 0.0,
+            max: 100.0,
+            activeColor: AppColors.primary,
+            inactiveColor: AppColors.border,
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -363,22 +713,89 @@ class _RuleCard extends StatelessWidget {
   }
 }
 
-class _ConditionPill extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _ConditionPill({required this.label, required this.color});
+class _ParamsGroup extends StatelessWidget {
+  final FarmProvider provider;
+  const _ParamsGroup({required this.provider});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: color),
-          maxLines: 1, overflow: TextOverflow.ellipsis),
+      child: Column(
+        children: [
+          _ParamRow(
+            label: 'Tiempo apertura (seg)',
+            value: provider.doorOpenTimeSeconds,
+            onChanged: (v) => provider.updateDoorParams(openTime: v),
+          ),
+          const Divider(height: 24),
+          _ParamRow(
+            label: 'Tiempo máx abierta (min)',
+            value: provider.doorMaxOpenMinutes,
+            onChanged: (v) => provider.updateDoorParams(maxOpen: v),
+          ),
+          const Divider(height: 24),
+          _ParamRow(
+            label: 'Tiempo de espera (seg)',
+            value: provider.doorWaitTimeSeconds,
+            onChanged: (v) => provider.updateDoorParams(waitTime: v),
+          ),
+          const Divider(height: 24),
+          _ParamRow(
+            label: 'Intentos máximos',
+            value: provider.doorMaxAttempts,
+            onChanged: (v) => provider.updateDoorParams(maxAttempts: v),
+          ),
+          const Divider(height: 24),
+          _ParamRow(
+            label: 'Frecuencia revisión (seg)',
+            value: provider.doorCheckFrequencySeconds,
+            onChanged: (v) => provider.updateDoorParams(checkFreq: v),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ParamRow extends StatelessWidget {
+  final String label;
+  final int value;
+  final void Function(int) onChanged;
+
+  const _ParamRow({required this.label, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.foreground))),
+        const SizedBox(width: 12),
+        IconButton(
+          icon: const Icon(Icons.remove_circle_outline_rounded, size: 20, color: AppColors.mutedForeground),
+          onPressed: () => onChanged((value - 1).clamp(1, 999)),
+        ),
+        Container(
+          width: 50,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          alignment: Alignment.center,
+          child: Text('$value', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+        ),
+        IconButton(
+          icon: const Icon(Icons.add_circle_outline_rounded, size: 20, color: AppColors.primary),
+          onPressed: () => onChanged(value + 1),
+        ),
+      ],
     );
   }
 }
@@ -409,7 +826,6 @@ class _SchedulesTab extends StatelessWidget {
         )),
 
         const SizedBox(height: 14),
-        // Add schedule button
         GestureDetector(
           onTap: () => _showAddScheduleDialog(context, provider),
           child: Container(
@@ -482,7 +898,6 @@ class _ScheduleCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Time
           Container(
             width: 56, height: 56,
             decoration: BoxDecoration(
@@ -501,7 +916,6 @@ class _ScheduleCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
 
-          // Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,7 +934,6 @@ class _ScheduleCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-                // Day chips
                 Row(
                   children: List.generate(7, (i) {
                     final active = schedule.days.length > i && schedule.days[i];
@@ -545,7 +958,6 @@ class _ScheduleCard extends StatelessWidget {
             ),
           ),
 
-          // Toggle + delete
           Column(
             children: [
               Switch.adaptive(

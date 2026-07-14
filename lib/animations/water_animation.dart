@@ -7,8 +7,9 @@ import '../models/farm_state.dart';
 /// Animated water trough — mirrors the React WaterModule scene.
 class WaterAnimation extends StatefulWidget {
   final WaterState waterState;
+  final double waterPercent;
 
-  const WaterAnimation({super.key, required this.waterState});
+  const WaterAnimation({super.key, required this.waterState, required this.waterPercent});
 
   @override
   State<WaterAnimation> createState() => _WaterAnimationState();
@@ -65,18 +66,14 @@ class _WaterAnimationState extends State<WaterAnimation>
   @override
   void didUpdateWidget(WaterAnimation oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.waterState != widget.waterState) {
+    if (oldWidget.waterState != widget.waterState || oldWidget.waterPercent != widget.waterPercent) {
       _applyState(widget.waterState, animate: true);
     }
   }
 
   void _applyState(WaterState state, {required bool animate}) {
-    double newTarget;
-    switch (state) {
-      case WaterState.full:    newTarget = 0.82; break;
-      case WaterState.filling: newTarget = 0.50; break;
-      case WaterState.empty:   newTarget = 0.04; break;
-    }
+    double newTarget = (widget.waterPercent / 100 * 0.78) + 0.04;
+    newTarget = newTarget.clamp(0.04, 0.82);
 
     _streamTimer?.cancel();
 
