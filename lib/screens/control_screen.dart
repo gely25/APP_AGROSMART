@@ -513,6 +513,8 @@ class _DoorModule extends StatelessWidget {
       _MetricRow(icon: Icons.person_outline_rounded, label: 'Operado por', value: state.doorLastUser),
     ];
 
+    final isMoving = state.doorState == DoorState.moving;
+
     Widget actions;
     switch (state.operationMode) {
       case OperationMode.manual:
@@ -546,8 +548,14 @@ class _DoorModule extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppColors.border),
               ),
-              child: const Center(
-                child: Icon(Icons.stop_circle_outlined, size: 16, color: AppColors.mutedForeground),
+              child: Center(
+                child: isMoving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.info),
+                      )
+                    : const Icon(Icons.stop_circle_outlined, size: 16, color: AppColors.mutedForeground),
               ),
             ),
           ],
@@ -568,15 +576,27 @@ class _DoorModule extends StatelessWidget {
         break;
     }
 
+    final stateLabel = switch (state.doorState) {
+      DoorState.open => 'Abierta',
+      DoorState.closed => 'Cerrada',
+      DoorState.moving => state.doorTarget == DoorState.open ? 'Abriendo…' : 'Cerrando…',
+    };
+    final stateTone = switch (state.doorState) {
+      DoorState.open => _Tone.success,
+      DoorState.closed => _Tone.neutral,
+      DoorState.moving => _Tone.info,
+    };
+
     return _ControlCard(
       icon: state.doorState == DoorState.open
           ? Icons.door_back_door_outlined
           : Icons.door_front_door_outlined,
       title: 'Puerta automática',
       subtitle: 'Portón principal del corral',
-      stateLabel: state.doorState == DoorState.open ? 'Abierta' : 'Cerrada',
-      stateTone: state.doorState == DoorState.open ? _Tone.success : _Tone.neutral,
-      animation: DoorAnimation(doorState: state.doorState),
+      stateLabel: stateLabel,
+      stateTone: stateTone,
+      statePulsing: isMoving,
+      animation: DoorAnimation(doorState: state.doorState, doorTarget: state.doorTarget),
       metrics: metrics,
       actions: actions,
     );
@@ -1369,6 +1389,7 @@ class _ControlCard extends StatelessWidget {
   final String subtitle;
   final String stateLabel;
   final _Tone stateTone;
+  final bool statePulsing;
   final Widget animation;
   final List<Widget> metrics;
   final Widget actions;
@@ -1379,6 +1400,7 @@ class _ControlCard extends StatelessWidget {
     required this.subtitle,
     required this.stateLabel,
     required this.stateTone,
+    this.statePulsing = false,
     required this.animation,
     required this.metrics,
     required this.actions,
@@ -1436,7 +1458,20 @@ class _ControlCard extends StatelessWidget {
                   duration: const Duration(milliseconds: 300),
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: _toneBg, borderRadius: BorderRadius.circular(999)),
-                  child: Text(stateLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _toneColor)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (statePulsing) ...[
+                        SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(strokeWidth: 1.6, color: _toneColor),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(stateLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _toneColor)),
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -4,7 +4,7 @@ import '../models/farm_state.dart';
 
 class Esp32Service {
   /// IP address of the ESP32. Change this to match your network configuration.
-  static String baseUrl = 'http://192.168.1.100';
+  static String baseUrl = 'http://10.16.146.175';
 
   static const Duration _timeout = Duration(seconds: 5);
 
@@ -30,51 +30,53 @@ class Esp32Service {
   // ── Alarm ─────────────────────────────────────────────────────────────────
   static Future<void> silenceAlarm() => _get('/silenceAlarm');
 
+  // ── Mode ──────────────────────────────────────────────────────────────────
+  static Future<void> setMode(String mode) => _get('/setMode?mode=$mode');
+
   // ── Private helpers ───────────────────────────────────────────────────────
   static Future<void> _get(String path) async {
-    final uri = Uri.parse('$baseUrl$path');
-    await http.get(uri).timeout(_timeout);
+    try {
+      final uri = Uri.parse('$baseUrl$path');
+      await http.get(uri).timeout(_timeout);
+    } catch (e) {
+      // Catch exceptions silently or rethrow depending on needs, but let's rethrow to let provider handle connection state
+      rethrow;
+    }
   }
 
   static FarmState _parseStatus(Map<String, dynamic> json) {
+    final modeStr = json['mode'] as String? ?? 'auto';
+    final isManual = modeStr == 'manual';
+    
     return FarmState(
-      connected: json['connected'] as bool? ?? true,
+      connected: true,
       lastUpdate: DateTime.now(),
       doorState: json['door'] == 'open' ? DoorState.open : DoorState.closed,
-      doorOpenCount: (json['doorOpenCount'] as int?) ?? 0,
-      doorOpenSeconds: (json['doorOpenSeconds'] as int?) ?? 0,
-      doorLastUser: (json['doorLastUser'] as String?) ?? 'Sistema',
-      waterState: _parseWater(json['water'] as String?),
-      waterPercent: (json['waterPercent'] as num?)?.toDouble() ?? 50.0,
-      waterCapacityL: (json['waterCapacityL'] as num?)?.toDouble() ?? 50.0,
-      waterDailyConsumptionL: (json['waterDailyConsumptionL'] as num?)?.toDouble() ?? 12.0,
-      valveOpen: json['valveOpen'] as bool? ?? false,
-      animalDetected: json['animalDetected'] as bool? ?? false,
-      lastMotionTime: json['lastMotionTime'] != null
-          ? DateTime.tryParse(json['lastMotionTime'] as String) ?? DateTime.now()
-          : DateTime.now(),
-      pirEventsToday: (json['pirEventsToday'] as int?) ?? 0,
-      alarmActive: json['alarm'] as bool? ?? false,
-      operationMode: OperationMode.automatic,
+      doorOpenCount: 0, // Calculated or stored in provider
+      doorOpenSeconds: 0, // Calculated or stored in provider
+      doorLastUser: isManual ? 'Operador' : 'Sistema',
+      waterState: json['water'] == 'full' ? WaterState.full : WaterState.empty,
+      waterPercent: json['water'] == 'full' ? 100.0 : 10.0,
+      waterCapacityL: 50.0,
+      waterDailyConsumptionL: 12.0,
+      valveOpen: json['pump'] as bool? ?? false,
+      animalDetected: json['motion'] as bool? ?? false,
+      lastMotionTime: DateTime.now(),
+      pirEventsToday: 0,
+      alarmActive: false,
+      operationMode: isManual ? OperationMode.manual : OperationMode.automatic,
       hitlPendingWater: false,
-      voltageV: (json['voltageV'] as num?)?.toDouble() ?? 3.28,
-      esp32TempC: (json['esp32TempC'] as num?)?.toDouble() ?? 42.0,
-      cpuUsagePercent: (json['cpuUsagePercent'] as int?) ?? 15,
-      memoryUsedKb: (json['memoryUsedKb'] as int?) ?? 200,
-      memoryTotalKb: (json['memoryTotalKb'] as int?) ?? 520,
-      latencyMs: (json['latencyMs'] as int?) ?? 20,
-      wifiRssi: (json['wifiRssi'] as int?) ?? -62,
+      voltageV: 3.3, // Fixed ESP32 operating voltage
+      esp32TempC: 0.0, // Internal temp not measured
+      cpuUsagePercent: 0, // Not monitored
+      memoryUsedKb: 0, // Not monitored
+      memoryTotalKb: 520,
+      latencyMs: 0, // Calculated dynamically in provider
+      wifiRssi: json['rssi'] as int? ?? -60,
       notifications: const [],
       auditLog: const [],
       events: const [],
     );
   }
-
-  static WaterState _parseWater(String? value) {
-    switch (value) {
-      case 'full':    return WaterState.full;
-      case 'filling': return WaterState.filling;
-      default:        return WaterState.empty;
-    }
-  }
 }
+

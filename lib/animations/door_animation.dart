@@ -6,8 +6,10 @@ const _duration = Duration(milliseconds: 1200);
 
 class DoorAnimation extends StatefulWidget {
   final DoorState doorState;
+  // While doorState == DoorState.moving, this says which way it's headed.
+  final DoorState? doorTarget;
 
-  const DoorAnimation({super.key, required this.doorState});
+  const DoorAnimation({super.key, required this.doorState, this.doorTarget});
 
   @override
   State<DoorAnimation> createState() => _DoorAnimationState();
@@ -18,6 +20,13 @@ class _DoorAnimationState extends State<DoorAnimation>
   late AnimationController _ctrl;
   late Animation<double> _slideAnimation; // 0.0 = closed, 1.0 = open (fully slid left)
 
+  bool get _isHeadedOpen {
+    if (widget.doorState == DoorState.moving) {
+      return widget.doorTarget == DoorState.open;
+    }
+    return widget.doorState == DoorState.open;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -26,7 +35,7 @@ class _DoorAnimationState extends State<DoorAnimation>
     _slideAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOutCubic),
     );
-    if (widget.doorState == DoorState.open) {
+    if (_isHeadedOpen) {
       _ctrl.value = 1.0;
     }
   }
@@ -34,9 +43,12 @@ class _DoorAnimationState extends State<DoorAnimation>
   @override
   void didUpdateWidget(DoorAnimation oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.doorState == widget.doorState) return;
+    final oldHeadedOpen = oldWidget.doorState == DoorState.moving
+        ? oldWidget.doorTarget == DoorState.open
+        : oldWidget.doorState == DoorState.open;
+    if (oldHeadedOpen == _isHeadedOpen) return;
 
-    if (widget.doorState == DoorState.open) {
+    if (_isHeadedOpen) {
       _ctrl.forward();
     } else {
       _ctrl.reverse();
@@ -122,45 +134,16 @@ class _DoorAnimationState extends State<DoorAnimation>
                       child: _ResponsiveFence(width: totalWidth - (rightPostPos + 10)),
                     ),
 
-                    // Gate and Ground Shadow clipped to the doorway area
+                    // Gate clipped to the doorway area
                     Positioned(
-                      bottom: 56,
+                      bottom: 64,
                       left: leftPostPos,
                       width: gateWidth,
-                      height: 104, // Space for shadow + gate
+                      height: 96,
                       child: ClipRect(
-                        child: Stack(
-                          children: [
-                            // Ground shadow (offset 8px lower than gate bottom: 64 - 56 = 8)
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              width: gateWidth,
-                              height: 12,
-                              child: Transform.translate(
-                                offset: Offset(slideOffset, 0),
-                                child: Container(
-                                  width: gateWidth,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(999),
-                                    color: Colors.black.withOpacity(0.20),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Gate
-                            Positioned(
-                              bottom: 8, // aligns to bottom: 64 relative to the main Stack
-                              left: 0,
-                              width: gateWidth,
-                              height: 96,
-                              child: Transform.translate(
-                                offset: Offset(slideOffset, 0),
-                                child: const _Gate(),
-                              ),
-                            ),
-                          ],
+                        child: Transform.translate(
+                          offset: Offset(slideOffset, 0),
+                          child: const _Gate(),
                         ),
                       ),
                     ),
@@ -278,110 +261,113 @@ class _Gate extends StatelessWidget {
       width: 152,
       height: 96,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFCAA477), Color(0xFFB98F5F)],
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF7C858D), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.28),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        // Color base de madera oscura para el borde exterior/marco principal
+        color: const Color(0xFF5A3E25),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFF3E2A18), width: 3),
       ),
       child: Stack(
         children: [
-          // Inner frame
+          // Fondo de las tablas (simula las uniones)
           Positioned.fill(
             child: Container(
-              margin: const EdgeInsets.all(1),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: const Color(0x808B939B), width: 2),
+              color: const Color(0xFF3A2514),
+            ),
+          ),
+          // Tablas horizontales de madera con gradiente y textura individual
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.all(2.0),
+              child: Column(
+                children: List.generate(4, (index) {
+                  return Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 1.5),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0xFF8B5A2B), // Madera clara
+                            Color(0xFF6E471E), // Madera media
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            offset: const Offset(0, 1),
+                            blurRadius: 1,
+                          )
+                        ]
+                      ),
+                    ),
+                  );
+                }),
               ),
             ),
           ),
-          // Wooden planks
-          Positioned(
-            left: 6,
-            right: 6,
-            top: 6,
-            bottom: 6,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(
-                4,
-                (_) => Container(
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: const Color(0xA0A67C52),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
+          // Soporte en diagonal clásico de puerta de establo/corral (Z-brace)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _DiagonalBracePainter(),
               ),
             ),
           ),
-          // Diagonal brace
+          // Bisagras reforzadas de hierro forjado negro (Izquierda)
           Positioned(
-            left: 8,
-            right: 8,
-            top: 8,
-            bottom: 8,
-            child: ClipRect(
-              child: Transform.rotate(
-                angle: -0.59,
-                alignment: Alignment.bottomLeft,
-                child: Container(
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: const Color(0xCC9AA3AB),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Hinges (left) - visually kept for consistency with current style
-          Positioned(
-            top: 8,
-            left: -4,
+            top: 12,
+            left: -2,
             child: Container(
-              width: 8,
+              width: 16,
               height: 10,
               decoration: BoxDecoration(
-                color: const Color(0xFF6B7178),
-                borderRadius: BorderRadius.circular(2),
+                color: const Color(0xFF2A2A2A),
+                borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
+                border: Border.all(color: const Color(0xFF1A1A1A), width: 1),
               ),
             ),
           ),
           Positioned(
-            bottom: 8,
-            left: -4,
+            bottom: 12,
+            left: -2,
             child: Container(
-              width: 8,
+              width: 16,
               height: 10,
               decoration: BoxDecoration(
-                color: const Color(0xFF6B7178),
-                borderRadius: BorderRadius.circular(2),
+                color: const Color(0xFF2A2A2A),
+                borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
+                border: Border.all(color: const Color(0xFF1A1A1A), width: 1),
               ),
             ),
           ),
-          // Latch handle (right)
+          // Cerrojo/Manija rústica (Derecha)
           Positioned(
-            right: -4,
+            right: 4,
             top: 0,
             bottom: 0,
             child: Center(
               child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF5C626A),
-                  shape: BoxShape.circle,
+                width: 12,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.4),
+                      blurRadius: 2,
+                      offset: const Offset(1, 1),
+                    )
+                  ]
+                ),
+                child: Center(
+                  child: Container(
+                    width: 4,
+                    height: 8,
+                    color: const Color(0xFF4A4A4A),
+                  ),
                 ),
               ),
             ),
@@ -391,3 +377,43 @@ class _Gate extends StatelessWidget {
     );
   }
 }
+
+// Pintor para la barra diagonal clásica de madera
+class _DiagonalBracePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF5A3E25) // Tono del marco
+      ..style = PaintingStyle.fill;
+
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.25)
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    // Definimos un travesaño diagonal desde arriba a la izquierda hacia abajo a la derecha
+    const double thickness = 10.0;
+    
+    // Sombra sutil de la diagonal
+    final shadowPath = Path();
+    shadowPath.moveTo(12, 4);
+    shadowPath.lineTo(size.width - 4, size.height - 12);
+    shadowPath.lineTo(size.width - 4, size.height - 12 + thickness);
+    shadowPath.lineTo(12, 4 + thickness);
+    shadowPath.close();
+    canvas.drawPath(shadowPath, shadowPaint);
+
+    // Dibujo principal de la barra
+    path.moveTo(10, 4);
+    path.lineTo(size.width - 6, size.height - 10);
+    path.lineTo(size.width - 6, size.height - 10 - thickness);
+    path.lineTo(10, 4 - thickness);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

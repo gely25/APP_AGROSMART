@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/farm_state.dart';
+import '../services/esp32_service.dart';
 
 int _evtId = 0;
 String _uid() => 'evt_${++_evtId}_${DateTime.now().millisecondsSinceEpoch}';
@@ -107,7 +108,7 @@ final _defaultCorrales = [
     name: 'Corral Principal',
     description: 'Corral de bovinos — Zona norte',
     macAddress: 'A4:CF:12:8E:2F:01',
-    ip: '192.168.1.120',
+    ip: '10.16.146.175',
     firmware: 'v1.0.0',
     rssi: -62,
     availability: 99.8,
@@ -348,80 +349,209 @@ class FarmProvider extends ChangeNotifier {
   FarmState get state => _state;
 
   Timer? _sensorTimer;
-  Timer? _fillTimer;
-  Timer? _waterTimer;
-  Timer? _telemetryTimer;
 
   FarmProvider() {
-    _startSimulation();
+    _startPolling();
   }
 
-  void _startSimulation() {
-    // PIR simulation: toggle every 8s
-    _sensorTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      final detected = _rng.nextDouble() > 0.65;
-      final changed = detected != _state.animalDetected;
-      if (changed) {
-        final now = DateTime.now();
-        if (detected) {
-          _addNotif(_makeNotif(
-            type: NotificationType.motion,
-            title: 'Movimiento detectado',
-            message: 'Sensor PIR activado en ${activeCorral?.name ?? "Corral"}.',
-          ));
+  void _startPolling() {
+    _sensorTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      final ip = activeCorral?.ip ?? '192.168.1.100';
+      Esp32Service.baseUrl = 'http://$ip';
+
+      final stopwatch = Stopwatch()..start();
+      try {
+        final freshState = await Esp32Service.getStatus();
+        final latency = stopwatch.elapsedMilliseconds;
+
+        // Transition detection
+        final wasConnected = _state.connected;
+        final oldDoor = _state.doorState;
+        final oldMotion = _state.animalDetected;
+        final oldValve = _state.valveOpen;
+
+        int newDoorOpenCount = _state.doorOpenCount;
+        int newDoorOpenSeconds = _state.doorOpenSeconds;
+        int newPirEventsToday = _state.pirEventsToday;
+        DateTime newLastMotionTime = _state.lastMotionTime;
+        DateTime? newDoorLastOpenedAt = _state.doorLastOpenedAt;
+
+        List<AppNotification> newNotifs = List.from(_state.notifications);
+        List<AuditEvent> newAudits = List.from(_state.auditLog);
+        List<FarmEvent> newEvents = List.from(_state.events);
+
+        void addLocalNotif(AppNotification n) {
+          newNotifs.insert(0, n);
+          if (newNotifs.length > 50) newNotifs.removeLast();
         }
-        _touch(_state.copyWith(
-          animalDetected: detected,
-          lastMotionTime: detected ? now : _state.lastMotionTime,
-          pirEventsToday: detected ? _state.pirEventsToday + 1 : _state.pirEventsToday,
-          lastUpdate: now,
-        ), detected ? 'Movimiento detectado' : 'Sin movimiento',
-          detected ? _makeAudit(type: AuditEventType.pir, action: 'Movimiento detectado', detail: 'Sensor PIR — Zona norte', origin: 'Sensor') : null,
-        );
-      }
-    });
 
-    // Water consumption: decrease by ~0.2% every 10s in auto/HITL
-    _waterTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (_state.waterState != WaterState.filling && _state.connected) {
-        final newPct = (_state.waterPercent - 0.15).clamp(0.0, 100.0);
-        var newState = _state.copyWith(waterPercent: newPct, lastUpdate: DateTime.now());
+        void addLocalAudit(AuditEvent a) {
+          newAudits.insert(0, a);
+          if (newAudits.length > 100) newAudits.removeLast();
+        }
 
-        // Auto-fill at 20% if auto mode or HITL pending approval
-        if (newPct <= 20.0 && _state.waterState != WaterState.empty) {
-          if (_state.operationMode == OperationMode.automatic) {
-            _scheduleAutoFill();
-          } else if (_state.operationMode == OperationMode.humanInTheLoop && !_state.hitlPendingWater) {
-            newState = newState.copyWith(hitlPendingWater: true);
-            _addNotif(_makeNotif(
-              type: NotificationType.waterLow,
-              title: 'Agua baja — Aprobación requerida',
-              message: 'El nivel de agua está en ${newPct.toStringAsFixed(0)}%. Se requiere confirmación para llenar.',
+        void addLocalEvent(String label) {
+          newEvents.insert(0, _makeEvent(label));
+          if (newEvents.length > 20) newEvents.removeLast();
+        }
+
+        if (!wasConnected) {
+          addLocalNotif(_makeNotif(
+            type: NotificationType.esp32Reconnected,
+            title: 'ESP32 Reconectado',
+            message: 'Se ha restablecido la comunicación con el controlador.',
+          ));
+          addLocalAudit(_makeAudit(
+            type: AuditEventType.network,
+            action: 'Conexión restablecida',
+            detail: 'Conexión exitosa con el ESP32.',
+          ));
+          addLocalEvent('Conexión establecida con ESP32');
+        }
+
+        // Door transitions
+        if (freshState.doorState != oldDoor) {
+          if (freshState.doorState == DoorState.open) {
+            newDoorOpenCount++;
+            newDoorLastOpenedAt = DateTime.now();
+            addLocalNotif(_makeNotif(
+              type: NotificationType.doorOpened,
+              title: 'Puerta abierta',
+              message: 'La puerta fue abierta por ${freshState.doorLastUser}.',
             ));
+            addLocalAudit(_makeAudit(
+              type: AuditEventType.door,
+              action: 'Puerta abierta',
+              detail: 'Apertura detectada',
+              origin: freshState.doorLastUser == 'Sistema' ? 'Automático' : 'Manual',
+              user: freshState.doorLastUser,
+            ));
+            addLocalEvent('Puerta abierta');
+          } else if (freshState.doorState == DoorState.closed) {
+            final openSecs = newDoorLastOpenedAt != null
+                ? DateTime.now().difference(newDoorLastOpenedAt).inSeconds
+                : 0;
+            newDoorOpenSeconds += openSecs;
+            addLocalNotif(_makeNotif(
+              type: NotificationType.doorClosed,
+              title: 'Puerta cerrada',
+              message: 'La puerta fue cerrada.',
+            ));
+            addLocalAudit(_makeAudit(
+              type: AuditEventType.door,
+              action: 'Puerta cerrada',
+              detail: 'Cierre detectado (Abierta durante ${openSecs}s)',
+              origin: 'Automático',
+            ));
+            addLocalEvent('Puerta cerrada');
           }
         }
-        _state = newState;
+
+        // PIR transitions
+        if (freshState.animalDetected != oldMotion) {
+          if (freshState.animalDetected) {
+            newPirEventsToday++;
+            newLastMotionTime = DateTime.now();
+            addLocalNotif(_makeNotif(
+              type: NotificationType.motion,
+              title: 'Movimiento detectado',
+              message: 'Sensor PIR activado en ${activeCorral?.name ?? "Corral"}.',
+            ));
+            addLocalAudit(_makeAudit(
+              type: AuditEventType.pir,
+              action: 'Movimiento detectado',
+              detail: 'Sensor PIR — Zona norte',
+              origin: 'Sensor',
+            ));
+            addLocalEvent('Movimiento detectado');
+          }
+        }
+
+        // Pump transitions
+        if (freshState.valveOpen != oldValve) {
+          if (freshState.valveOpen) {
+            addLocalNotif(_makeNotif(
+              type: NotificationType.waterLow,
+              title: 'Bomba activada',
+              message: 'El bebedero comenzó a llenarse.',
+            ));
+            addLocalAudit(_makeAudit(
+              type: AuditEventType.water,
+              action: 'Llenado iniciado',
+              detail: 'Bomba de agua encendida',
+              origin: 'Automático',
+            ));
+            addLocalEvent('Bebedero llenándose');
+          } else {
+            addLocalNotif(_makeNotif(
+              type: NotificationType.waterFilled,
+              title: 'Bomba apagada',
+              message: 'El bebedero ha finalizado el llenado.',
+            ));
+            addLocalAudit(_makeAudit(
+              type: AuditEventType.water,
+              action: 'Llenado completado',
+              detail: 'Bomba de agua apagada',
+              origin: 'Automático',
+            ));
+            addLocalEvent('Bebedero lleno');
+          }
+        }
+
+        // HITL check
+        bool hitlPending = _state.hitlPendingWater;
+        if (freshState.operationMode == OperationMode.humanInTheLoop && freshState.waterState == WaterState.empty && !_state.hitlPendingWater) {
+          hitlPending = true;
+          addLocalNotif(_makeNotif(
+            type: NotificationType.waterLow,
+            title: 'Agua baja — Aprobación requerida',
+            message: 'El nivel de agua está bajo. Se requiere confirmación para llenar.',
+          ));
+        }
+
+        _state = freshState.copyWith(
+          connected: true,
+          doorOpenCount: newDoorOpenCount,
+          doorOpenSeconds: newDoorOpenSeconds,
+          doorLastOpenedAt: newDoorLastOpenedAt,
+          pirEventsToday: newPirEventsToday,
+          lastMotionTime: newLastMotionTime,
+          notifications: newNotifs,
+          auditLog: newAudits,
+          events: newEvents,
+          latencyMs: latency,
+          hitlPendingWater: hitlPending,
+        );
         notifyListeners();
+      } catch (e) {
+        if (_state.connected) {
+          List<AppNotification> newNotifs = List.from(_state.notifications);
+          List<AuditEvent> newAudits = List.from(_state.auditLog);
+          List<FarmEvent> newEvents = List.from(_state.events);
+
+          newNotifs.insert(0, _makeNotif(
+            type: NotificationType.esp32Disconnected,
+            title: 'ESP32 Desconectado',
+            message: 'No se puede comunicar con el controlador en la IP $ip.',
+          ));
+          newAudits.insert(0, _makeAudit(
+            type: AuditEventType.network,
+            action: 'Conexión perdida',
+            detail: 'Fallo al comunicarse con el ESP32: $e',
+          ));
+          newEvents.insert(0, _makeEvent('Error de conexión con ESP32'));
+
+          _state = _state.copyWith(
+            connected: false,
+            latencyMs: 0,
+            notifications: newNotifs,
+            auditLog: newAudits,
+            events: newEvents,
+          );
+          notifyListeners();
+        }
       }
     });
-
-    // Telemetry fluctuation every 6s
-    _telemetryTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      _state = _state.copyWith(
-        voltageV: 3.20 + _rng.nextDouble() * 0.15,
-        esp32TempC: 38.0 + _rng.nextDouble() * 8.0,
-        cpuUsagePercent: 10 + _rng.nextInt(20),
-        memoryUsedKb: 190 + _rng.nextInt(40),
-        latencyMs: 12 + _rng.nextInt(50),
-        wifiRssi: -55 - _rng.nextInt(20),
-      );
-      notifyListeners();
-    });
-  }
-
-  void _scheduleAutoFill() {
-    if (_state.waterState == WaterState.filling) return;
-    fillWater(user: 'Sistema', origin: 'Automático');
   }
 
   String get uptime {
@@ -514,74 +644,57 @@ class FarmProvider extends ChangeNotifier {
 
   // ── Door Actions ──────────────────────────────────────────────────────────
 
-  void openDoor({String user = 'Operador', String origin = 'Manual'}) {
-    _touch(
-      _state.copyWith(
-        doorState: DoorState.open,
-        doorOpenCount: _state.doorOpenCount + 1,
-        doorLastUser: user,
-        doorLastOpenedAt: DateTime.now(),
-        lastUpdate: DateTime.now(),
-      ),
-      'Puerta abierta',
-      _makeAudit(type: AuditEventType.door, action: 'Puerta abierta', detail: 'Apertura por $user', user: user, origin: origin),
-    );
-    _addNotif(_makeNotif(type: NotificationType.doorOpened, title: 'Puerta abierta', message: 'La puerta fue abierta por $user.'));
+  void openDoor({String user = 'Operador', String origin = 'Manual'}) async {
+    if (_state.doorState == DoorState.moving) return;
+    _state = _state.copyWith(doorState: DoorState.moving, doorTarget: DoorState.open);
+    notifyListeners();
+
+    try {
+      final ip = activeCorral?.ip ?? '192.168.1.100';
+      Esp32Service.baseUrl = 'http://$ip';
+      await Esp32Service.openDoor();
+    } catch (e) {
+      _state = _state.copyWith(doorState: DoorState.closed, clearDoorTarget: true);
+      notifyListeners();
+    }
   }
 
-  void closeDoor({String user = 'Operador', String origin = 'Manual'}) {
-    final openSecs = _state.doorLastOpenedAt != null
-        ? DateTime.now().difference(_state.doorLastOpenedAt!).inSeconds
-        : 0;
-    _touch(
-      _state.copyWith(
-        doorState: DoorState.closed,
-        doorOpenSeconds: _state.doorOpenSeconds + openSecs,
-        lastUpdate: DateTime.now(),
-      ),
-      'Puerta cerrada',
-      _makeAudit(type: AuditEventType.door, action: 'Puerta cerrada', detail: 'Cierre por $user', user: user, origin: origin),
-    );
-    _addNotif(_makeNotif(type: NotificationType.doorClosed, title: 'Puerta cerrada', message: 'La puerta fue cerrada por $user.'));
+  void closeDoor({String user = 'Operador', String origin = 'Manual'}) async {
+    if (_state.doorState == DoorState.moving) return;
+    _state = _state.copyWith(doorState: DoorState.moving, doorTarget: DoorState.closed);
+    notifyListeners();
+
+    try {
+      final ip = activeCorral?.ip ?? '192.168.1.100';
+      Esp32Service.baseUrl = 'http://$ip';
+      await Esp32Service.closeDoor();
+    } catch (e) {
+      _state = _state.copyWith(doorState: DoorState.open, clearDoorTarget: true);
+      notifyListeners();
+    }
   }
 
   // ── Water Actions ─────────────────────────────────────────────────────────
 
-  void fillWater({String user = 'Operador', String origin = 'Manual'}) {
-    _touch(
-      _state.copyWith(
-        waterState: WaterState.filling,
-        valveOpen: true,
-        hitlPendingWater: false,
-        lastUpdate: DateTime.now(),
-      ),
-      'Bebedero llenándose',
-      _makeAudit(type: AuditEventType.water, action: 'Llenado iniciado', detail: 'Válvula abierta por $user', user: user, origin: origin),
-    );
-    _fillTimer?.cancel();
-    _fillTimer = Timer(const Duration(milliseconds: 3000), () {
-      if (_state.waterState == WaterState.filling) {
-        _touch(
-          _state.copyWith(
-            waterState: WaterState.full,
-            waterPercent: 100.0,
-            valveOpen: false,
-            waterLastFilledAt: DateTime.now(),
-            lastUpdate: DateTime.now(),
-          ),
-          'Bebedero lleno',
-          _makeAudit(type: AuditEventType.water, action: 'Llenado completado', detail: 'Bebedero al 100%', user: 'Sistema', origin: origin),
-        );
-        _addNotif(_makeNotif(type: NotificationType.waterFilled, title: 'Bebedero lleno', message: 'El bebedero fue llenado exitosamente al 100%.'));
-      }
-    });
+  void fillWater({String user = 'Operador', String origin = 'Manual'}) async {
+    try {
+      final ip = activeCorral?.ip ?? '192.168.1.100';
+      Esp32Service.baseUrl = 'http://$ip';
+      await Esp32Service.fillWater();
+    } catch (e) {
+      // Catch error
+    }
   }
 
-  void emptyWater() => _touch(
-    _state.copyWith(waterState: WaterState.empty, waterPercent: 0, valveOpen: false, lastUpdate: DateTime.now()),
-    'Bebedero vaciado',
-    _makeAudit(type: AuditEventType.water, action: 'Bebedero vaciado', detail: 'Vaciado manual', user: _userName, origin: 'Manual'),
-  );
+  void emptyWater() async {
+    try {
+      final ip = activeCorral?.ip ?? '192.168.1.100';
+      Esp32Service.baseUrl = 'http://$ip';
+      await Esp32Service.emptyWater();
+    } catch (e) {
+      // Catch error
+    }
+  }
 
   void approveWaterFill() => fillWater(user: _userName, origin: 'HITL');
 
@@ -606,9 +719,17 @@ class FarmProvider extends ChangeNotifier {
 
   // ── Mode ──────────────────────────────────────────────────────────────────
 
-  void setMode(OperationMode mode) {
-    _state = _state.copyWith(operationMode: mode, hitlPendingWater: false);
-    notifyListeners();
+  void setMode(OperationMode mode) async {
+    try {
+      final ip = activeCorral?.ip ?? '192.168.1.100';
+      Esp32Service.baseUrl = 'http://$ip';
+      final modeStr = mode == OperationMode.manual ? 'manual' : 'auto';
+      await Esp32Service.setMode(modeStr);
+      _state = _state.copyWith(operationMode: mode, hitlPendingWater: false);
+      notifyListeners();
+    } catch (e) {
+      // Catch error
+    }
   }
 
   // ── PIR Actions ───────────────────────────────────────────────────────────
@@ -695,9 +816,6 @@ class FarmProvider extends ChangeNotifier {
   @override
   void dispose() {
     _sensorTimer?.cancel();
-    _fillTimer?.cancel();
-    _waterTimer?.cancel();
-    _telemetryTimer?.cancel();
     super.dispose();
   }
 }

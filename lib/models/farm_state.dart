@@ -373,6 +373,7 @@ class FarmState {
 
   // Hardware: Door
   final DoorState doorState;
+  final DoorState? doorTarget; // set while doorState == moving: where it's headed
   final int doorOpenCount;
   final int doorOpenSeconds;
   final String doorLastUser;
@@ -420,6 +421,7 @@ class FarmState {
     required this.connected,
     required this.lastUpdate,
     required this.doorState,
+    this.doorTarget,
     required this.doorOpenCount,
     required this.doorOpenSeconds,
     required this.doorLastUser,
@@ -508,6 +510,8 @@ class FarmState {
     bool? connected,
     DateTime? lastUpdate,
     DoorState? doorState,
+    DoorState? doorTarget,
+    bool clearDoorTarget = false,
     int? doorOpenCount,
     int? doorOpenSeconds,
     String? doorLastUser,
@@ -539,6 +543,7 @@ class FarmState {
       connected: connected ?? this.connected,
       lastUpdate: lastUpdate ?? this.lastUpdate,
       doorState: doorState ?? this.doorState,
+      doorTarget: clearDoorTarget ? null : (doorTarget ?? this.doorTarget),
       doorOpenCount: doorOpenCount ?? this.doorOpenCount,
       doorOpenSeconds: doorOpenSeconds ?? this.doorOpenSeconds,
       doorLastUser: doorLastUser ?? this.doorLastUser,
