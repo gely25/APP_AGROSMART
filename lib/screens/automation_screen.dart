@@ -431,19 +431,15 @@ class _AddEditRuleDialogState extends State<_AddEditRuleDialog> {
   late double _selectedWaterThreshold;
 
   static const _conditions = [
-    ('water_below', 'Nivel de agua umbral'),
-    ('motion_detected', 'Movimiento detectado'),
+    ('motion_detected', 'Movimiento detectado (PIR)'),
     ('door_open', 'Puerta abierta'),
   ];
 
   static const _actions = [
-    ('fill_water', 'Solicitar llenado del bebedero'),
     ('send_notification', 'Notificar al operador'),
     ('request_door', 'Solicitar apertura de puerta'),
-    ('trigger_alarm', 'Activar alarma física'),
+    ('trigger_alarm', 'Activar LED de alarma'),
   ];
-
-  final _waterThresholds = [15.0, 25.0, 40.0, 80.0];
 
   @override
   void initState() {
@@ -452,25 +448,16 @@ class _AddEditRuleDialogState extends State<_AddEditRuleDialog> {
       final r = widget.editRule!;
       _requiresHITL = r.requiresHITL;
       _action = r.action;
-      if (r.condition.startsWith('water_below')) {
-        _condition = 'water_below';
-        final val = double.tryParse(r.condition.split('_').last) ?? 20.0;
-        _selectedWaterThreshold = _waterThresholds.contains(val) ? val : 25.0;
-      } else {
-        _condition = r.condition;
-        _selectedWaterThreshold = 25.0;
-      }
+      _condition = r.condition;
     } else {
-      _condition = 'water_below';
-      _action = 'fill_water';
+      _condition = 'motion_detected';
+      _action = 'send_notification';
       _requiresHITL = false;
-      _selectedWaterThreshold = 25.0;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isWater = _condition == 'water_below';
     final title = widget.editRule == null ? 'Crear Regla' : 'Editar Regla';
 
     return AlertDialog(
@@ -500,30 +487,6 @@ class _AddEditRuleDialogState extends State<_AddEditRuleDialog> {
                 ),
               ),
             ),
-
-            if (isWater) ...[
-              const SizedBox(height: 12),
-              const Text('Nivel de agua umbral:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.mutedForeground)),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: _waterThresholds.map((val) {
-                  final selected = _selectedWaterThreshold == val;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedWaterThreshold = val),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: selected ? AppColors.primary : AppColors.muted,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: selected ? AppColors.primary : AppColors.border),
-                      ),
-                      child: Text('${val.toInt()}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: selected ? Colors.white : AppColors.foreground)),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
 
             const SizedBox(height: 16),
             const Text('ENTONCES ejecutar acción:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.mutedForeground)),
@@ -561,14 +524,13 @@ class _AddEditRuleDialogState extends State<_AddEditRuleDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         ElevatedButton(
           onPressed: () {
-            final condLabel = _condition == 'water_below' ? 'nivel de agua < ${_selectedWaterThreshold.toInt()}%' : _conditions.firstWhere((c) => c.$1 == _condition).$2;
-            final condVal = _condition == 'water_below' ? 'water_below_${_selectedWaterThreshold.toInt()}' : _condition;
+            final condLabel = _conditions.firstWhere((c) => c.$1 == _condition).$2;
             final actLabel = _actions.firstWhere((a) => a.$1 == _action).$2;
 
             if (widget.editRule != null) {
               final updated = AutomationRule(
                 id: widget.editRule!.id,
-                condition: condVal,
+                condition: _condition,
                 conditionLabel: condLabel,
                 action: _action,
                 actionLabel: actLabel,
@@ -579,7 +541,7 @@ class _AddEditRuleDialogState extends State<_AddEditRuleDialog> {
             } else {
               final newRule = AutomationRule(
                 id: 'rule_${DateTime.now().millisecondsSinceEpoch}',
-                condition: condVal,
+                condition: _condition,
                 conditionLabel: condLabel,
                 action: _action,
                 actionLabel: actLabel,
@@ -597,7 +559,7 @@ class _AddEditRuleDialogState extends State<_AddEditRuleDialog> {
   }
 }
 
-// ── Thresholds Tab ────────────────────────────────────────────────────────────
+// ── Thresholds Tab ─────────────────────────────────────────────────────────
 
 class _ThresholdsTab extends StatelessWidget {
   final FarmProvider provider;
@@ -608,45 +570,14 @@ class _ThresholdsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const _SectionLabel('CONFIGURACIÓN DE UMBRALES DE AGUA'),
-        const SizedBox(height: 10),
-        _ThresholdSliderCard(
-          label: 'Nivel Crítico',
-          value: provider.waterCriticalThreshold,
-          recommended: 15.0,
-          onChanged: (v) => provider.updateThresholds(critical: v),
+        ListTile(
+          leading: const Icon(Icons.settings_backup_restore_rounded, size: 16),
+          title: const Text('Restablecer valores recomendados'),
+          onTap: () {
+            provider.resetDoorParams();
+          },
         ),
-        const SizedBox(height: 10),
-        _ThresholdSliderCard(
-          label: 'Nivel Bajo',
-          value: provider.waterLowThreshold,
-          recommended: 25.0,
-          onChanged: (v) => provider.updateThresholds(low: v),
-        ),
-        const SizedBox(height: 10),
-        _ThresholdSliderCard(
-          label: 'Nivel Normal',
-          value: provider.waterNormalThreshold,
-          recommended: 80.0,
-          onChanged: (v) => provider.updateThresholds(normal: v),
-        ),
-        const SizedBox(height: 10),
-        _ThresholdSliderCard(
-          label: 'Nivel Máximo',
-          value: provider.waterMaxThreshold,
-          recommended: 100.0,
-          onChanged: (v) => provider.updateThresholds(max: v),
-        ),
-        const SizedBox(height: 14),
-        Center(
-          child: OutlinedButton.icon(
-            onPressed: provider.resetThresholds,
-            icon: const Icon(Icons.settings_backup_restore_rounded, size: 16),
-            label: const Text('Restablecer valores recomendados'),
-          ),
-        ),
-        const SizedBox(height: 24),
-
+        const SizedBox(height: 16),
         const _SectionLabel('PARÁMETROS DE PUERTA AUTOMÁTICA'),
         const SizedBox(height: 10),
         _ParamsGroup(provider: provider),
@@ -738,24 +669,6 @@ class _ParamsGroup extends StatelessWidget {
             label: 'Tiempo máx abierta (min)',
             value: provider.doorMaxOpenMinutes,
             onChanged: (v) => provider.updateDoorParams(maxOpen: v),
-          ),
-          const Divider(height: 24),
-          _ParamRow(
-            label: 'Tiempo de espera (seg)',
-            value: provider.doorWaitTimeSeconds,
-            onChanged: (v) => provider.updateDoorParams(waitTime: v),
-          ),
-          const Divider(height: 24),
-          _ParamRow(
-            label: 'Intentos máximos',
-            value: provider.doorMaxAttempts,
-            onChanged: (v) => provider.updateDoorParams(maxAttempts: v),
-          ),
-          const Divider(height: 24),
-          _ParamRow(
-            label: 'Frecuencia revisión (seg)',
-            value: provider.doorCheckFrequencySeconds,
-            onChanged: (v) => provider.updateDoorParams(checkFreq: v),
           ),
         ],
       ),
@@ -868,7 +781,6 @@ class _ScheduleCard extends StatelessWidget {
     switch (schedule.action) {
       case 'open_door': return 'Abrir puerta';
       case 'close_door': return 'Cerrar puerta';
-      case 'fill_water': return 'Llenar bebedero';
       default: return schedule.action;
     }
   }
@@ -877,7 +789,6 @@ class _ScheduleCard extends StatelessWidget {
     switch (schedule.action) {
       case 'open_door': return Icons.lock_open_rounded;
       case 'close_door': return Icons.lock_rounded;
-      case 'fill_water': return Icons.water_drop_rounded;
       default: return Icons.play_arrow_rounded;
     }
   }
@@ -995,7 +906,6 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
   static const _actions = [
     ('open_door', 'Abrir puerta'),
     ('close_door', 'Cerrar puerta'),
-    ('fill_water', 'Llenar bebedero'),
   ];
 
   @override

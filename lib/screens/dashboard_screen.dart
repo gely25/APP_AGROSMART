@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../providers/farm_provider.dart';
 import '../models/farm_state.dart';
@@ -76,34 +75,7 @@ class DashboardScreen extends StatelessWidget {
                 const SizedBox(height: 16),
               ],
 
-              // ── Horizontal summary cards ──────────────────────────────────
-              Row(
-                children: [
-                  // Eventos hoy card
-                  Expanded(
-                    child: _SummaryStatCard(
-                      icon: Icons.monitor_heart_outlined,
-                      iconColor: const Color(0xFF10B981),
-                      value: '17',
-                      title: 'Eventos hoy',
-                      subtitle: '10 registrados',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Agua consumida card
-                  Expanded(
-                    child: _SummaryStatCard(
-                      icon: Icons.opacity_rounded,
-                      iconColor: const Color(0xFF3B82F6),
-                      value: '22',
-                      valueSuffix: ' L',
-                      title: 'Agua consumida',
-                      subtitle: 'últimas 24 h',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
 
               // ── DISPOSITIVOS ───────────────────────────────────────────────
               const _SectionLabel('DISPOSITIVOS'),
@@ -113,7 +85,7 @@ class DashboardScreen extends StatelessWidget {
               _DeviceRow(
                 icon: Icons.door_front_door_outlined,
                 title: 'Puerta automática',
-                subtitle: '6 aperturas hoy · Operador (PIR)',
+                subtitle: 'Controlada por servomotor',
                 statusText: s.doorState == DoorState.open ? 'Abierta' : 'Cerrada',
                 statusColor: s.doorState == DoorState.open ? const Color(0xFF10B981) : AppColors.mutedForeground,
                 statusBgColor: s.doorState == DoorState.open ? const Color(0xFFE6F4EA) : const Color(0xFFF1F3F4),
@@ -124,10 +96,10 @@ class DashboardScreen extends StatelessWidget {
               _DeviceRow(
                 icon: Icons.opacity_rounded,
                 title: 'Bebedero inteligente',
-                subtitle: '17 L de 50 L',
-                statusText: '${s.waterPercent.toInt()}%',
-                statusColor: s.waterLow ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-                statusBgColor: s.waterLow ? const Color(0xFFFFF7EA) : const Color(0xFFE6F4EA),
+                subtitle: 'Boya física (Lleno / Sin agua)',
+                statusText: s.waterState == WaterState.full ? 'Lleno' : 'Sin Agua',
+                statusColor: s.waterState == WaterState.full ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                statusBgColor: s.waterState == WaterState.full ? const Color(0xFFE6F4EA) : const Color(0xFFFFF7EA),
               ),
               const SizedBox(height: 10),
 
@@ -135,7 +107,7 @@ class DashboardScreen extends StatelessWidget {
               _DeviceRow(
                 icon: Icons.track_changes_rounded,
                 title: 'Sensor PIR de presencia',
-                subtitle: '12 eventos · Norte — Acceso principal',
+                subtitle: 'Detección por sensor físico PIR',
                 statusText: s.animalDetected ? 'Movimiento' : 'Tranquilo',
                 statusColor: s.animalDetected ? const Color(0xFFF59E0B) : AppColors.mutedForeground,
                 statusBgColor: s.animalDetected ? const Color(0xFFFFF7EA) : const Color(0xFFF1F3F4),
@@ -178,24 +150,6 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // ── Ver monitoreo técnico ──────────────────────────────────────
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: ListTile(
-                  title: const Text(
-                    'Ver monitoreo técnico',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.foreground),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.mutedForeground),
-                  onTap: () {
-                    // Technical monitoring navigation
-                  },
-                ),
-              ),
             ],
           ),
         );

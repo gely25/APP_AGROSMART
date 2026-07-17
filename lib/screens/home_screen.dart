@@ -5,9 +5,9 @@ import '../theme/app_theme.dart';
 import '../providers/farm_provider.dart';
 import '../models/farm_state.dart';
 import '../screens/corrales_screen.dart';
+import '../services/notification_service.dart';
 import 'dashboard_screen.dart';
 import 'control_screen.dart';
-import 'monitoring_screen.dart';
 import 'audit_screen.dart';
 import 'automation_screen.dart';
 import 'notifications_screen.dart';
@@ -26,7 +26,6 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _tabs = [
     _TabItem(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Dashboard'),
     _TabItem(Icons.tune_rounded, Icons.tune_outlined, 'Control'),
-    _TabItem(Icons.monitor_heart_rounded, Icons.monitor_heart_outlined, 'Monitoreo'),
     _TabItem(Icons.history_rounded, Icons.history_outlined, 'Auditoría'),
     _TabItem(Icons.auto_fix_high_rounded, Icons.auto_fix_high_outlined, 'Reglas'),
   ];
@@ -34,10 +33,27 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _pages = [
     DashboardScreen(),
     ControlScreen(),
-    MonitoringScreen(),
     AuditScreen(),
     AutomationScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Cuando el usuario toca una notificación de animal detectado,
+    // navegar automáticamente al tab de Control (índice 1).
+    NotificationService.onNotificationTapped = (payload) {
+      if (payload.startsWith('motion_')) {
+        if (mounted) setState(() => _tab = 1);
+      }
+    };
+  }
+
+  @override
+  void dispose() {
+    NotificationService.onNotificationTapped = null;
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

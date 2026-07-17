@@ -47,7 +47,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 10),
               _SettingsGroup(children: [
                 _SettingsInfo(label: 'Nombre', value: corral?.name ?? '—'),
-                _SettingsInfo(label: 'Dirección IP', value: corral?.ip ?? '—'),
+                _SettingsInfoEditable(
+                  label: 'Dirección IP',
+                  value: corral?.ip ?? '—',
+                  onTap: () => _showEditIpDialog(context, provider, corral?.ip ?? ''),
+                ),
                 _SettingsInfo(label: 'MAC ESP32', value: corral?.macAddress ?? '—'),
                 _SettingsInfo(label: 'Firmware', value: corral?.firmware ?? 'v1.0.0'),
                 _SettingsInfo(label: 'Disponibilidad', value: '${corral?.availability.toStringAsFixed(1) ?? "—"}%'),
@@ -173,6 +177,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _showEditIpDialog(BuildContext ctx, FarmProvider provider, String currentIp) {
+    final controller = TextEditingController(text: currentIp);
+    showDialog(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppColors.card,
+        title: const Text('Dirección IP del ESP32', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ingresa la IP local del ESP32. La conexión se actualizará de inmediato.',
+              style: TextStyle(fontSize: 12, color: AppColors.mutedForeground, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                hintText: '192.168.1.100',
+                prefixIcon: const Icon(Icons.wifi_rounded, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              final ip = controller.text.trim();
+              if (ip.isNotEmpty) {
+                provider.updateActiveCorralIp(ip);
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text('IP actualizada a $ip'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.primary,
+                  ),
+                );
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -429,4 +486,39 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(text,
       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 1.1, color: AppColors.mutedForeground));
+}
+
+class _SettingsInfoEditable extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+  const _SettingsInfoEditable({required this.label, required this.value, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(fontSize: 13, color: AppColors.foreground),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(value,
+                  style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.edit_outlined, size: 14, color: AppColors.primary),
+          ],
+        ),
+      ),
+    );
+  }
 }

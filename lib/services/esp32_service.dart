@@ -22,6 +22,9 @@ class Esp32Service {
   // ── Door ──────────────────────────────────────────────────────────────────
   static Future<void> openDoor() => _get('/openDoor');
   static Future<void> closeDoor() => _get('/closeDoor');
+  static Future<void> setDoorParams(int openTime, int maxOpen) =>
+      _get('/setDoorParams?openTime=$openTime&maxOpen=$maxOpen');
+
 
   // ── Water ─────────────────────────────────────────────────────────────────
   static Future<void> fillWater() => _get('/fillWater');

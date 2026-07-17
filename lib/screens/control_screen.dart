@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+
 import '../theme/app_theme.dart';
 import '../providers/farm_provider.dart';
 import '../models/farm_state.dart';
@@ -8,6 +10,7 @@ import '../widgets/alarm_card.dart';
 import '../animations/door_animation.dart';
 import '../animations/pir_sensor_animation.dart';
 import '../animations/water_animation.dart';
+
 
 class ControlScreen extends StatelessWidget {
   const ControlScreen({super.key});
@@ -35,6 +38,8 @@ class ControlScreen extends StatelessWidget {
               AlarmCard(alarmActive: s.alarmActive, onSilence: provider.silenceAlarm),
               const SizedBox(height: 14),
 
+
+
               // HITL pending water approval
               if (s.hitlPendingWater) ...[
                 _HitlApprovalBanner(
@@ -44,11 +49,7 @@ class ControlScreen extends StatelessWidget {
                 const SizedBox(height: 14),
               ],
 
-              // HITL: Thresholds editor
-              if (s.operationMode == OperationMode.humanInTheLoop) ...[
-                _ThresholdEditor(provider: provider),
-                const SizedBox(height: 14),
-              ],
+
 
               // Door Module
               _DoorModule(state: s, provider: provider),
@@ -68,6 +69,7 @@ class ControlScreen extends StatelessWidget {
     );
   }
 }
+
 
 // ── Mode Selector ────────────────────────────────────────────────────────────
 
@@ -263,165 +265,6 @@ class _HitlApprovalBanner extends StatelessWidget {
 
 // ── HITL Threshold Editor ─────────────────────────────────────────────────────
 
-class _ThresholdEditor extends StatefulWidget {
-  final FarmProvider provider;
-  const _ThresholdEditor({required this.provider});
-
-  @override
-  State<_ThresholdEditor> createState() => _ThresholdEditorState();
-}
-
-class _ThresholdEditorState extends State<_ThresholdEditor> {
-  late double _critical;
-  late double _low;
-  late double _normal;
-  bool _dirty = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _critical = widget.provider.waterCriticalThreshold;
-    _low = widget.provider.waterLowThreshold;
-    _normal = widget.provider.waterNormalThreshold;
-  }
-
-  void _save() {
-    widget.provider.updateThresholds(
-      critical: _critical,
-      low: _low,
-      normal: _normal,
-    );
-    setState(() => _dirty = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Umbrales actualizados'), duration: Duration(seconds: 2)),
-    );
-  }
-
-  void _reset() {
-    widget.provider.resetThresholds();
-    setState(() {
-      _critical = widget.provider.waterCriticalThreshold;
-      _low = widget.provider.waterLowThreshold;
-      _normal = widget.provider.waterNormalThreshold;
-      _dirty = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.warning.withOpacity(0.35), width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.warningBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.tune_rounded, size: 18, color: AppColors.warning),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Umbrales HITL', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                    Text('Configura cuándo el sistema solicita tu aprobación',
-                        style: TextStyle(fontSize: 11, color: AppColors.mutedForeground)),
-                  ],
-                ),
-              ),
-              if (_dirty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.warningBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text('Sin guardar',
-                      style: TextStyle(fontSize: 9, color: AppColors.warning, fontWeight: FontWeight.w700)),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Sliders
-          _ThresholdSlider(
-            label: 'Nivel crítico de agua',
-            icon: Icons.warning_amber_rounded,
-            iconColor: AppColors.destructive,
-            value: _critical,
-            min: 5,
-            max: 30,
-            unit: '%',
-            onChanged: (v) => setState(() { _critical = v; _dirty = true; }),
-          ),
-          const SizedBox(height: 14),
-          _ThresholdSlider(
-            label: 'Nivel bajo de agua',
-            icon: Icons.water_drop_outlined,
-            iconColor: AppColors.warning,
-            value: _low,
-            min: 15,
-            max: 50,
-            unit: '%',
-            onChanged: (v) => setState(() { _low = v; _dirty = true; }),
-          ),
-          const SizedBox(height: 14),
-          _ThresholdSlider(
-            label: 'Nivel objetivo de llenado',
-            icon: Icons.water_drop_rounded,
-            iconColor: AppColors.success,
-            value: _normal,
-            min: 60,
-            max: 100,
-            unit: '%',
-            onChanged: (v) => setState(() { _normal = v; _dirty = true; }),
-          ),
-
-          const SizedBox(height: 16),
-          // Actions
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _dirty ? _save : null,
-                  icon: const Icon(Icons.save_rounded, size: 14),
-                  label: const Text('Guardar'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    backgroundColor: AppColors.warning,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.muted,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: _reset,
-                icon: const Icon(Icons.restart_alt_rounded, size: 14),
-                label: const Text('Restablecer'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _ThresholdSlider extends StatelessWidget {
   final String label;
@@ -514,6 +357,8 @@ class _DoorModule extends StatelessWidget {
     ];
 
     final isMoving = state.doorState == DoorState.moving;
+    final isOpen = state.doorState == DoorState.open;
+    final isClosed = state.doorState == DoorState.closed;
 
     Widget actions;
     switch (state.operationMode) {
@@ -522,7 +367,7 @@ class _DoorModule extends StatelessWidget {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: state.doorState == DoorState.closed
+                onPressed: (!isMoving && !isOpen)
                     ? () => provider.openDoor(user: 'Operador', origin: 'Manual')
                     : null,
                 icon: const Icon(Icons.lock_open_rounded, size: 14),
@@ -532,7 +377,7 @@ class _DoorModule extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: state.doorState == DoorState.open
+                onPressed: (!isMoving && !isClosed)
                     ? () => provider.closeDoor(user: 'Operador', origin: 'Manual')
                     : null,
                 icon: const Icon(Icons.lock_rounded, size: 14),
@@ -847,10 +692,19 @@ class _PirModule extends StatelessWidget {
               children: [
                 Expanded(
                   child: _SmallAction(
-                    label: 'Activar alarma',
-                    icon: Icons.notifications_active_rounded,
-                    onTap: provider.triggerAlarm,
-                    color: AppColors.warning,
+                    label: 'Verificar puerta',
+                    icon: Icons.door_front_door_outlined,
+                    onTap: () {
+                      // Desplazarse o enfocar visualmente el módulo de la puerta
+                      // Como estamos en la misma pantalla de control, realizamos un scroll al inicio o mostramos un SnackBar indicando que verifique el estado arriba
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('🚪 Estado de la puerta: ${provider.state.doorState == DoorState.open ? "Abierta" : "Cerrada"}. Controla la puerta en la sección superior.'),
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    },
+                    color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1031,52 +885,73 @@ class _PirStatusPillState extends State<_PirStatusPill> with SingleTickerProvide
 
 // ── Water Module ─────────────────────────────────────────────────────────────
 
-class _WaterModule extends StatelessWidget {
+class _WaterModule extends StatefulWidget {
   final FarmState state;
   final FarmProvider provider;
   const _WaterModule({required this.state, required this.provider});
 
   @override
+  State<_WaterModule> createState() => _WaterModuleState();
+}
+
+class _WaterModuleState extends State<_WaterModule> {
+  bool _localAnimating = false;
+  Timer? _animationTimer;
+
+  void _triggerFillingAnimation() {
+    _animationTimer?.cancel();
+    setState(() {
+      _localAnimating = true;
+    });
+    _animationTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted) {
+        setState(() {
+          _localAnimating = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final lastFilledStr = state.waterLastFilledAt != null
-        ? DateFormat('HH:mm dd/MM').format(state.waterLastFilledAt!)
+    final lastFilledStr = widget.state.waterLastFilledAt != null
+        ? DateFormat('HH:mm dd/MM').format(widget.state.waterLastFilledAt!)
         : 'Nunca';
-    final liters = state.waterLiters;
-    final autonomy = state.waterAutonomyHours;
 
     Widget actions;
-    switch (state.operationMode) {
+    switch (widget.state.operationMode) {
       case OperationMode.manual:
         actions = Row(
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: (state.waterState != WaterState.filling && state.waterPercent < 100)
-                    ? () => provider.fillWater(user: 'Operador', origin: 'Manual')
+                onPressed: (widget.state.waterState != WaterState.full && !_localAnimating)
+                    ? () {
+                        widget.provider.fillWater(user: 'Operador', origin: 'Manual');
+                        _triggerFillingAnimation();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('💧 Proceso de llenado iniciado'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
                     : null,
                 icon: const Icon(Icons.water_drop_rounded, size: 14),
-                label: const Text('Llenar'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: state.waterState != WaterState.empty ? provider.emptyWater : null,
-                icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
-                label: const Text('Vaciar'),
+                label: const Text('Llenar bebedero'),
               ),
             ),
           ],
         );
         break;
       case OperationMode.automatic:
-        actions = Consumer<FarmProvider>(
-          builder: (_, prov, __) => _AutoThresholdInfo(
-            critical: prov.waterCriticalThreshold,
-            low: prov.waterLowThreshold,
-            normal: prov.waterNormalThreshold,
-          ),
-        );
+        actions = const _AutoThresholdInfo();
         break;
       case OperationMode.humanInTheLoop:
         actions = _HitlActionRow(
@@ -1089,34 +964,30 @@ class _WaterModule extends StatelessWidget {
 
     return _ControlCard(
       icon: Icons.water_drop_outlined,
-      title: 'Bebedero inteligente',
-      subtitle: 'Sensor de nivel ultrasónico',
-      stateLabel: state.waterLow
-          ? '⚠️ Nivel bajo'
-          : state.waterState == WaterState.full
-              ? 'Lleno'
-              : state.waterState == WaterState.filling
-                  ? 'Llenándose…'
-                  : 'Vacío',
-      stateTone: state.waterLow
-          ? _Tone.alert
-          : state.waterState == WaterState.filling
-              ? _Tone.info
-              : _Tone.success,
-      animation: WaterAnimation(waterState: state.waterState, waterPercent: state.waterPercent),
+      title: 'Bebedero',
+      subtitle: 'Sensor de flotador',
+      stateLabel: widget.state.waterState == WaterState.full ? 'Estado: LLENO' : 'Estado: SIN AGUA',
+      stateTone: widget.state.waterState == WaterState.full ? _Tone.success : _Tone.alert,
+      animation: WaterAnimation(
+        waterState: _localAnimating ? WaterState.filling : widget.state.waterState,
+        waterPercent: _localAnimating
+            ? 100.0
+            : (widget.state.waterState == WaterState.full ? 100.0 : 10.0),
+      ),
       metrics: [
-        _MetricRow(icon: Icons.percent_rounded, label: 'Nivel', value: '${state.waterPercent.toStringAsFixed(0)}%'),
-        _MetricRow(icon: Icons.water_rounded, label: 'Litros disponibles', value: '${liters.toStringAsFixed(1)} L'),
-        _MetricRow(icon: Icons.local_drink_outlined, label: 'Capacidad total', value: '${state.waterCapacityL.toStringAsFixed(0)} L'),
-        _MetricRow(icon: Icons.timelapse_rounded, label: 'Autonomía estimada', value: autonomy > 24 ? '>24h' : '${autonomy.toStringAsFixed(1)}h'),
-        _MetricRow(icon: Icons.speed_rounded, label: 'Consumo diario', value: '${state.waterDailyConsumptionL.toStringAsFixed(1)} L/día'),
-        _MetricRow(icon: Icons.access_time_rounded, label: 'Último llenado', value: lastFilledStr),
         _MetricRow(
-          icon: Icons.settings_input_component_rounded,
-          label: 'Válvula',
-          value: state.valveOpen ? 'Abierta' : 'Cerrada',
-          valueColor: state.valveOpen ? AppColors.success : AppColors.foreground,
+          icon: Icons.sensors_rounded,
+          label: 'Sensor flotador',
+          value: widget.state.waterState == WaterState.full ? '🟢 LLENO' : '🔴 SIN AGUA',
+          valueColor: widget.state.waterState == WaterState.full ? AppColors.success : AppColors.destructive,
         ),
+        _MetricRow(
+          icon: Icons.electrical_services_rounded,
+          label: 'Bomba de agua',
+          value: _localAnimating ? 'Activa (Llenando...)' : 'Apagada',
+          valueColor: _localAnimating ? AppColors.info : AppColors.foreground,
+        ),
+        _MetricRow(icon: Icons.access_time_rounded, label: 'Último llenado', value: lastFilledStr),
       ],
       actions: actions,
     );
@@ -1128,7 +999,21 @@ class _WaterModule extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _WaterHitlSheet(state: state, provider: provider),
+      builder: (_) => _WaterHitlSheet(
+        state: widget.state,
+        provider: widget.provider,
+        isFilling: _localAnimating,
+        onApprove: () {
+          widget.provider.fillWater(user: 'HITL Operador', origin: 'HITL');
+          _triggerFillingAnimation();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('💧 Proceso de llenado iniciado'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -1136,7 +1021,14 @@ class _WaterModule extends StatelessWidget {
 class _WaterHitlSheet extends StatelessWidget {
   final FarmState state;
   final FarmProvider provider;
-  const _WaterHitlSheet({required this.state, required this.provider});
+  final bool isFilling;
+  final VoidCallback onApprove;
+  const _WaterHitlSheet({
+    required this.state,
+    required this.provider,
+    required this.isFilling,
+    required this.onApprove,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1162,7 +1054,7 @@ class _WaterHitlSheet extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Nivel actual: ${state.waterPercent.toStringAsFixed(0)}% · ${state.waterLiters.toStringAsFixed(1)} L disponibles',
+            'Flotador: ${state.waterState == WaterState.full ? "🟢 LLENO" : "🔴 SIN AGUA"} · Bomba: ${isFilling ? "Activa" : "Apagada"}',
             style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground),
           ),
           const SizedBox(height: 20),
@@ -1170,18 +1062,8 @@ class _WaterHitlSheet extends StatelessWidget {
             icon: Icons.water_drop_rounded,
             label: 'Aprobar llenado del bebedero',
             color: AppColors.info,
-            onTap: (state.waterState != WaterState.filling && state.waterPercent < 100) ? () {
-              provider.fillWater(user: 'HITL Operador', origin: 'HITL');
-              Navigator.pop(context);
-            } : null,
-          ),
-          const SizedBox(height: 10),
-          _HitlSheetAction(
-            icon: Icons.remove_circle_outline_rounded,
-            label: 'Aprobar vaciado del bebedero',
-            color: AppColors.destructive,
-            onTap: state.waterState != WaterState.empty ? () {
-              provider.emptyWater();
+            onTap: (state.waterState == WaterState.empty && !isFilling) ? () {
+              onApprove();
               Navigator.pop(context);
             } : null,
           ),
@@ -1201,10 +1083,7 @@ class _WaterHitlSheet extends StatelessWidget {
 // ── Auto threshold info (Automático mode) ────────────────────────────────────
 
 class _AutoThresholdInfo extends StatelessWidget {
-  final double critical;
-  final double low;
-  final double normal;
-  const _AutoThresholdInfo({required this.critical, required this.low, required this.normal});
+  const _AutoThresholdInfo();
 
   @override
   Widget build(BuildContext context) {
@@ -1227,22 +1106,25 @@ class _AutoThresholdInfo extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          _AutoThresholdRow(icon: Icons.warning_amber_rounded, iconColor: AppColors.destructive,
-              label: 'Umbral crítico', value: '${critical.toStringAsFixed(0)}%'),
+          const _AutoThresholdRow(
+            icon: Icons.sensors_rounded,
+            iconColor: AppColors.success,
+            label: 'Boya / Flotador',
+            value: 'Control físico de nivel',
+          ),
           const SizedBox(height: 4),
-          _AutoThresholdRow(icon: Icons.water_drop_outlined, iconColor: AppColors.warning,
-              label: 'Umbral bajo', value: '${low.toStringAsFixed(0)}%'),
-          const SizedBox(height: 4),
-          _AutoThresholdRow(icon: Icons.water_drop_rounded, iconColor: AppColors.success,
-              label: 'Objetivo llenado', value: '${normal.toStringAsFixed(0)}%'),
-          const SizedBox(height: 6),
-          const Text('El sistema llenará automáticamente el bebedero cuando el nivel caiga al umbral bajo.',
-              style: TextStyle(fontSize: 10, color: AppColors.mutedForeground)),
+          const _AutoThresholdRow(
+            icon: Icons.info_outline_rounded,
+            iconColor: AppColors.info,
+            label: 'Bomba',
+            value: 'Alimentación continua USB',
+          ),
         ],
       ),
     );
   }
 }
+
 
 class _AutoThresholdRow extends StatelessWidget {
   final IconData icon;

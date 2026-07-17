@@ -4,8 +4,11 @@ import 'providers/farm_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/corrales_screen.dart';
 import 'theme/app_theme.dart';
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
   runApp(
     MultiProvider(
       providers: [
