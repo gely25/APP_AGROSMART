@@ -2,7 +2,7 @@
 
 ## Descripción
 
-SmartFarm es una aplicación móvil de grado comercial desarrollada en Flutter para la administración, monitoreo técnico y control en tiempo real de corrales pecuarios automatizados. Mediante comunicación HTTP/REST con microcontroladores ESP32 y sensores embebidos, permite operar infraestructura crítica, gestionar automatizaciones y analizar diagnósticos de hardware directamente en el campo.
+SmartFarm es una aplicación móvil desarrollada en Flutter para la administración, monitoreo técnico y control en tiempo real de corrales pecuarios automatizados. Mediante comunicación HTTP/REST con microcontroladores ESP32 y sensores embebidos, permite operar infraestructura crítica, gestionar automatizaciones y analizar diagnósticos de hardware directamente en el campo.
 
 Este proyecto evolucionó desde una maqueta conceptual hacia un sistema completo con flujos lógicos comerciales, microinteracciones avanzadas y arquitectura de telemetría robusta.
 
